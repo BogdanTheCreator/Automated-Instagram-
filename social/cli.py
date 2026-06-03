@@ -114,10 +114,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("topic", nargs="?", help="What the video is about (a prompt).")
     p.add_argument("--brand", "-b", default=DEFAULT_BRAND,
                    help=f"Niche preset (default: {DEFAULT_BRAND}). See --list-brands.")
-    p.add_argument("--duration", "-d", type=int, default=35,
-                   help="Target video length in seconds (default 35).")
+    p.add_argument("--duration", "-d", type=int, default=0,
+                   help="Target length in seconds. 0 = auto (35s for short-form, "
+                        "~600s for long-form story brands).")
+    p.add_argument("--minutes", type=int, default=0,
+                   help="Target length in minutes (long-form convenience; overrides --duration).")
+    p.add_argument("--format", choices=["short", "long"], default=None,
+                   help="Content format: 'short' (Reels/Shorts) or 'long' (8-12 min "
+                        "narrated story). Default: auto from brand (story brands -> long).")
+    p.add_argument("--long", action="store_true", help="Shortcut for --format long.")
     p.add_argument("--points", "-p", type=int, default=4,
-                   help="Number of value points/tips (default 4).")
+                   help="Number of value points/tips for short-form (default 4).")
     p.add_argument("--out", "-o", default="content_kits",
                    help="Output root folder (default ./content_kits).")
     p.add_argument("--render", action="store_true",
@@ -128,6 +135,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--doctor", action="store_true", help="Report premium feature availability.")
     p.add_argument("--list-brands", action="store_true", help="List niche presets and exit.")
     p.add_argument("--ideas", action="store_true", help="Print topic ideas for the brand and exit.")
+    # Long-form YouTube "Video Pack" modes
+    p.add_argument("--videopack", action="store_true",
+                   help="Generate a complete long-form YouTube Video Pack (script + SEO "
+                        "+ thumbnails + promotion). Topic optional; one is proposed if omitted.")
+    p.add_argument("--weekly", action="store_true",
+                   help="Weekly bundle: opportunity report + a full Video Pack for the "
+                        "top topic (used by the weekly workflow).")
+    p.add_argument("--report", action="store_true",
+                   help="Write only the weekly opportunity report (10 ranked topics).")
     # Calendar mode
     p.add_argument("--calendar", action="store_true",
                    help="Generate a multi-day content calendar instead of a single kit.")
@@ -157,6 +173,69 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Refresh the long-lived IG token (needs IG_APP_ID, IG_APP_SECRET, IG_ACCESS_TOKEN).")
     p.add_argument("--version", action="version", version=f"social {__version__}")
     return p
+
+
+def _resolve_fmt(args) -> Optional[str]:
+    if getattr(args, "long", False):
+        return "long"
+    return args.format  # None -> auto by brand
+
+
+def _resolve_seconds(args) -> int:
+    if getattr(args, "minutes", 0) and args.minutes > 0:
+        return args.minutes * 60
+    return args.duration  # 0 -> auto in engine
+
+
+def _run_videopack(args) -> int:
+    topic = args.topic
+    if not topic:
+        from .videopack import build_opportunities
+        opps, _ = build_opportunities(args.brand, 5)
+        topic = opps[0].topic if opps else get_brand(args.brand).topic_seeds[0]
+        print(f"  No topic given; selected the top proposed topic:\n    \"{topic}\"\n")
+    try:
+        kit = generate(topic, brand_key=args.brand, seconds=_resolve_seconds(args), fmt="long")
+    except (KeyError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    out = args.out if args.out != "content_kits" else "video_packs"
+    folder = write_kit(kit, out_root=out)
+    yt = kit.youtube or {}
+    print(f"\n  Video Pack ready: {folder}\n")
+    print(f"  Title    : {yt.get('best_title', kit.title)}")
+    print(f"  Brand    : {kit.brand_name} ({kit.brand_key})")
+    print(f"  Length   : ~{kit.total_seconds / 60:.0f} min across {len(kit.scenes)} beats")
+    print(f"  Script by: {kit.generator}")
+    print("\n  Open VIDEO_PACK.md for the full, ready-to-produce package.")
+    return 0
+
+
+def _run_weekly(args) -> int:
+    from .videopack import write_weekly
+    out = args.out if args.out != "content_kits" else "weekly_out"
+    try:
+        folder = write_weekly(args.brand, out_root=out, seconds=_resolve_seconds(args))
+    except (KeyError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"\n  Weekly bundle ready: {folder}")
+    print(f"  - {os.path.join(folder, 'opportunities.md')}  (10 ranked topics)")
+    print(f"  - {os.path.join(folder, 'video-pack')}/        (full pack for the top topic)")
+    print(f"  - {os.path.join(folder, 'INDEX.md')}")
+    return 0
+
+
+def _run_report(args) -> int:
+    from .videopack import write_opportunities
+    out = args.out if args.out != "content_kits" else "weekly_out"
+    try:
+        write_opportunities(args.brand, 10, out_root=out)
+    except (KeyError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"\n  Opportunity report ready: {os.path.join(out, 'opportunities.md')}")
+    return 0
 
 
 def _run_autopost(args) -> int:
@@ -319,6 +398,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.calendar:
         return _run_calendar(args)
+    if args.weekly:
+        return _run_weekly(args)
+    if args.report:
+        return _run_report(args)
+    if args.videopack:
+        return _run_videopack(args)
 
     if not args.topic:
         build_parser().print_help()
@@ -328,14 +413,31 @@ def main(argv: Optional[List[str]] = None) -> int:
         kit = generate(
             topic=args.topic,
             brand_key=args.brand,
-            seconds=args.duration,
+            seconds=_resolve_seconds(args),
             point_count=args.points,
+            fmt=_resolve_fmt(args),
         )
     except KeyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
     folder = write_kit(kit, out_root=args.out)
+
+    if kit.format == "long":
+        yt = kit.youtube or {}
+        print(f"\n  Video Pack ready: {folder}\n")
+        print(f"  Title    : {yt.get('best_title', kit.title)}")
+        print(f"  Brand    : {kit.brand_name} ({kit.brand_key})")
+        print(f"  Length   : ~{kit.total_seconds / 60:.0f} min across {len(kit.scenes)} beats")
+        print(f"  Script by: {kit.generator}")
+        print(f"  Hook     : {kit.hook}")
+        print("\n  Files:")
+        for name in ("VIDEO_PACK.md", "titles.md", "script.md", "seo.md", "thumbnails.md",
+                     "promotion.md", "captions.srt", "voiceover.txt", "voiceover.ssml",
+                     "shotlist.md", "storyboard.html", "content_package.json"):
+            print(f"    - {os.path.join(folder, name)}")
+        print("\n  Tip: open VIDEO_PACK.md for the full package; storyboard.html previews pacing.")
+        return 0
 
     print(f"\n  Content kit ready: {folder}\n")
     print(f"  Title    : {kit.title}")

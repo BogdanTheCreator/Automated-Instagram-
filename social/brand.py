@@ -64,6 +64,19 @@ class Brand:
     # sub-topics combined with formats to produce varied daily prompts.
     content_pillars: List[str] = field(default_factory=list)
     themes: List[str] = field(default_factory=list)
+    # --- Long-form / storytelling support (optional; defaults keep short-form
+    #     "tips" presets working unchanged) ------------------------------------
+    # niche_kind selects the generator: "tips" = short value videos (Reels),
+    # "story" = long-form narrated storytelling (8-12 min YouTube videos).
+    niche_kind: str = "tips"
+    # YouTube title frameworks. Use {t} for the title-cased topic. When empty,
+    # the engine falls back to a generic set.
+    title_templates: List[str] = field(default_factory=list)
+    # Thumbnail concepts (mobile-first). {topic} is substituted if present.
+    thumbnail_concepts: List[str] = field(default_factory=list)
+    # Default length (seconds) used when niche_kind == "story" and the caller
+    # does not pass an explicit duration. 600s ~= 10 minutes.
+    default_long_seconds: int = 600
 
 
 # --------------------------------------------------------------------------- #
@@ -335,8 +348,114 @@ _LONGEVITY = Brand(
 )
 
 
+_BETRAYAL_REVENGE = Brand(
+    key="betrayal_revenge",
+    display_name="Betrayal & Revenge Stories",
+    handle_ideas=["@quiet.revenge.stories", "@the.betrayal.files",
+                  "@served.cold.stories", "@they.chose.wrong"],
+    tagline="Betrayal, karma, and the quiet revenge that follows.",
+    voice=("a grounded, slow-burn storytime narrator; tense and empathetic, never "
+           "tabloid or cheesy; builds believable tension to a satisfying, earned payoff"),
+    tts_voice="neutral_calm",
+    palette=Palette(bg="#0B0B0F", bg2="#1C0E14", text="#F3EEF2",
+                    accent="#E4584C", accent2="#C9A36B", subtle="#33262C"),
+    font_family="Georgia, 'Times New Roman', 'Playfair Display', serif",
+    # Hooks double as cold-open lines and thumbnail-adjacent angles. {topic} is
+    # the cleaned prompt (e.g. "my sister forged our mother's will").
+    hook_templates=[
+        "They thought I'd never find out about {topic}. They were wrong.",
+        "I trusted them completely — until {topic}.",
+        "Everyone said to let it go. But {topic}? That I could not forgive.",
+        "{Topic}. So I stayed quiet, and I started paying attention.",
+        "The day I learned the truth about {topic}, everything changed.",
+        "They betrayed the wrong person. This is the story of {topic}.",
+    ],
+    cta_templates=[
+        "If this story hit home, subscribe — there's a new one every week.",
+        "Subscribe for more real-feeling betrayal and revenge stories.",
+        "Hit subscribe, then tell me in the comments: did they deserve it?",
+        "Follow for the stories people are too afraid to tell.",
+    ],
+    point_lead_ins=[
+        "Then this happened:", "Here's where it turned:", "What they didn't know:",
+        "The part that still gets me:", "And then everything shifted:",
+    ],
+    payoff_templates=[
+        "By the time they understood what was happening, it was already too late.",
+        "I never had to raise my voice. The truth did all the damage.",
+        "Karma didn't knock. It walked in, sat down, and made itself at home.",
+    ],
+    caption_openers=[
+        "Some betrayals don't get loud. They get even.",
+        "The best revenge is letting the truth arrive right on schedule.",
+        "Save this one — the ending earns it.",
+    ],
+    # Reused as the YouTube tag bank (the '#' is stripped for tags).
+    hashtag_bank={
+        "broad": ["#storytime", "#revenge", "#betrayal", "#drama", "#truestory"],
+        "mid": ["#redditstories", "#cheatingstories", "#revengestory", "#familydrama",
+                "#karma", "#storytimevideo", "#relationshipdrama", "#reddit"],
+        "niche": ["#quietrevenge", "#prorevenge", "#cheatingspouse", "#inheritancedrama",
+                  "#workplacebetrayal", "#maliciouscompliance", "#narcissist", "#cheatingpartner"],
+        "branded": ["#thebetrayalfiles"],
+    },
+    topic_seeds=[
+        "my husband's affair with my best friend",
+        "the business partner who secretly drained our company",
+        "my sister forged our mother's will",
+        "the coworker who took credit for my work for years",
+        "my fiance's secret second family",
+        "the landlord who tried to keep our deposit and lied about it",
+    ],
+    series_name="The Betrayal Files",
+    best_post_times_utc=["18:00", "22:00", "00:00"],
+    content_pillars=["cheating & affairs", "family betrayal", "workplace betrayal",
+                     "inheritance revenge", "quiet / delayed justice", "karma"],
+    themes=[
+        "a cheating spouse exposed at the worst possible moment",
+        "a best friend who betrayed a private confidence",
+        "a sibling who quietly stole an inheritance",
+        "parents who played favorites for decades",
+        "a business partner who forged signatures",
+        "a boss who stole an employee's idea",
+        "a coworker who sabotaged a promotion",
+        "in-laws who tried to break up a marriage",
+        "a landlord who refused to return a deposit",
+        "an ex who spread lies after the breakup",
+        "a friend who copied a business and undercut it",
+        "a relative who borrowed money and vanished",
+        "a wedding nearly ruined by a jealous sibling",
+        "a fake friend who used someone for years",
+        "a stepparent who hid a will",
+        "a manager who took credit, then got exposed",
+        "a cheating partner caught by one small mistake",
+        "a scammer who targeted the wrong grandmother",
+        "a coworker who framed someone and got caught",
+        "a neighbor who crossed a line and regretted it",
+    ],
+    niche_kind="story",
+    title_templates=[
+        "{t}",
+        "They Never Thought I'd Find Out",
+        "{t} — I Waited for the Right Moment",
+        "I Stayed Quiet. Then Everything Changed.",
+        "The Truth About {t}",
+        "How It All Came Back Around",
+    ],
+    thumbnail_concepts=[
+        "Split frame: a warm family photo torn down the middle. Overlay 2 words "
+        "like \"SHE LIED\" in bold condensed type, red accent. High contrast for mobile.",
+        "A hand hiding a phone behind a back, screen glowing. Overlay \"THE TEXT\". "
+        "Dark, cinematic, single light source.",
+        "An empty chair at a dinner table with one place setting removed. Overlay "
+        "\"NOT INVITED\". Moody, lots of negative space so it reads at thumbnail size.",
+    ],
+    default_long_seconds=600,
+)
+
+
 PRESETS: Dict[str, Brand] = {
-    b.key: b for b in (_AI_INCOME, _PRIVACY, _MONEY, _LONGEVITY)
+    b.key: b for b in (_AI_INCOME, _PRIVACY, _MONEY, _LONGEVITY, _BETRAYAL_REVENGE)
 }
 
 DEFAULT_BRAND = "ai_income"

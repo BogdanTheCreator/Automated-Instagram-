@@ -1,0 +1,92 @@
+# Weekly faceless-YouTube "Video Pack" — runs on GitHub's servers, free.
+#
+# WHAT IT DOES (every Monday morning):
+#   1. Scans the niche and writes a ranked opportunity report (10 story topics).
+#   2. Generates a complete, production-ready Video Pack for the top topic:
+#      title options, full 8-12 min narration script, SEO upload pack (description,
+#      tags, chapters, pinned comment), thumbnail concepts and promotion ideas.
+#   3. Uploads everything as a downloadable artifact you review before producing.
+#
+# This is text-only: no video is rendered and nothing is published, so it needs
+# no API keys and uses almost no CI minutes. You stay in control of the final
+# script, thumbnail, render and upload (supervised automation).
+#
+# OPTIONAL SECRET (GitHub -> Settings -> Secrets and variables -> Actions):
+#   OPENAI_API_KEY  -> writes the topic ideas + full narration with an LLM.
+#                      Without it you still get a complete, editable beat-sheet
+#                      scaffold for free.
+# OPTIONAL VARIABLE:
+#   BRAND  -> defaults to betrayal_revenge (the niche this channel is built for).
+
+name: Weekly Video Pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: "Niche brand key"
+        default: "betrayal_revenge"
+      topic:
+        description: "Optional: force a specific topic (leave blank to auto-pick the week's best)"
+        default: ""
+  schedule:
+    # 08:00 UTC every Monday. Edit the time/day to change the cadence.
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-videopack
+  cancel-in-progress: false
+
+jobs:
+  videopack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate the weekly opportunity report + Video Pack
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          BRAND="${{ github.event.inputs.brand }}"
+          [ -z "$BRAND" ] && BRAND="${{ vars.BRAND }}"
+          [ -z "$BRAND" ] && BRAND="betrayal_revenge"
+          TOPIC="${{ github.event.inputs.topic }}"
+          echo "Using brand: $BRAND"
+          if [ -n "$TOPIC" ]; then
+            echo "Forcing topic: $TOPIC"
+            python -m social.cli "$TOPIC" --brand "$BRAND" --long --out weekly_out
+          else
+            python -m social.cli --weekly --brand "$BRAND" --out weekly_out
+          fi
+
+      - name: Print a quick summary to the run log
+        if: always()
+        run: |
+          echo "## Weekly Video Pack" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f weekly_out/opportunities.md ]; then
+            echo "### Opportunity report" >> "$GITHUB_STEP_SUMMARY"
+            sed -n '1,40p' weekly_out/opportunities.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          PACK="$(find weekly_out -name VIDEO_PACK.md | head -1)"
+          if [ -n "$PACK" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### This week's Video Pack (preview)" >> "$GITHUB_STEP_SUMMARY"
+            sed -n '1,30p' "$PACK" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the weekly bundle as a downloadable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-video-pack
+          path: weekly_out/**
+          if-no-files-found: warn

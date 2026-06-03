@@ -83,6 +83,56 @@ how-to, quick win, ...), so a month reads as varied and intentional. With an
 `OPENAI_API_KEY` set, the topics are proposed by the LLM instead. A lightweight
 example lives in [`samples/sample-30-day-calendar/`](samples/sample-30-day-calendar).
 
+## Long-form faceless YouTube videos (Video Packs)
+
+The same engine also produces **long-form, narrated YouTube videos** (8–12 min)
+for storytelling channels — not just short-form Reels. The included
+**`betrayal_revenge`** brand ("Betrayal & Revenge Stories") is a complete,
+ready-to-run storytelling niche: dramatic-but-grounded voice, story-arc scripts,
+high-CTR (non-misleading) titles, mobile-first thumbnail concepts, and a full
+SEO upload pack.
+
+```bash
+# one full Video Pack from a topic
+python3 -m social.cli "my sister forged our mother's will" --brand betrayal_revenge
+
+# let it pick the week's strongest topic for you
+python3 -m social.cli --videopack --brand betrayal_revenge
+
+# just this week's ranked topic ideas (no script)
+python3 -m social.cli --report --brand betrayal_revenge
+
+# the full weekly bundle: opportunity report + a complete pack for the top topic
+python3 -m social.cli --weekly --brand betrayal_revenge
+```
+
+A long-form pack (format auto-selected for story brands; force with `--long`)
+adds these files to the kit:
+
+| File | Purpose |
+|------|---------|
+| `VIDEO_PACK.md` | One combined, production-ready doc: title, hook, full script, SEO, thumbnails, promotion, production notes |
+| `titles.md` | Recommended title + variations with character counts |
+| `seo.md` | Description, 15 tags, primary keyword, 0:00-anchored chapters, pinned comment |
+| `thumbnails.md` | Mobile-first thumbnail concepts (≤4 words of overlay) |
+| `promotion.md` | Shorts ideas + community post ideas to promote the video |
+| `script.md` / `voiceover.txt` / `voiceover.ssml` / `captions.srt` | The narration, ready for any TTS |
+
+Without an `OPENAI_API_KEY`, the script is a complete, brand-aware **beat sheet**
+(structure + per-beat guidance) you can edit; **set the key and the same command
+writes the full ~1,500-word narration**. Everything else (titles, SEO,
+thumbnails, promotion) is generated either way.
+
+### Weekly Video Pack on autopilot (free, on GitHub's servers)
+
+[`.github/workflows/weekly-videopack.yml`](.github/workflows/weekly-videopack.yml)
+runs **every Monday at 08:00 UTC** (and on-demand from the **Actions** tab). It
+writes the opportunity report + a full Video Pack for the week's top topic and
+uploads it as a **downloadable artifact**. It renders no video and publishes
+nothing, so it needs no keys and almost no CI minutes — you keep human control of
+the final script, thumbnail, render and upload. Add `OPENAI_API_KEY` as a repo
+secret to upgrade the writing.
+
 ## Auto-posting to Instagram (hands-off, no PC install)
 
 The account can post **by itself on a schedule, running on GitHub's servers** —
@@ -145,8 +195,9 @@ Run `python3 -m social.cli --doctor` to see what's active in your environment.
 social/
   brand.py        niche/brand presets: voice, palette, hooks, CTAs, hashtags, themes
   providers.py    pluggable LLM / TTS / stock adapters (offline stubs + real impls)
-  engine.py       prompt -> ContentKit; writes all kit files
+  engine.py       prompt -> ContentKit; writes all kit files (short + long-form)
   calendar.py     N-day content calendar (topics x formats); batch kit generation
+  videopack.py    long-form YouTube Video Pack + weekly opportunity report
   storyboard.py   animated, dependency-free HTML Reel preview
   render.py       ffmpeg MP4 assembly + voiceover mixing
   publisher.py    Instagram Graph API publishing (Reels + image), stdlib only
@@ -154,7 +205,8 @@ social/
 notebooks/
   content_studio.ipynb   one-click Google Colab: month of content + MP4s -> zip
 .github/workflows/
-  autopost.yml    scheduled cloud auto-poster (no local install needed)
+  autopost.yml          scheduled cloud auto-poster (no local install needed)
+  weekly-videopack.yml  weekly long-form YouTube Video Pack (artifact, no keys)
 run.sh            one-command local runner with capability detection
 SETUP_AUTOPOST.md guided Instagram auto-posting setup
 ```
