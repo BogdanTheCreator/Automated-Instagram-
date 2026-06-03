@@ -52,6 +52,25 @@ def _has_ffprobe() -> bool:
     return shutil.which("ffprobe") is not None
 
 
+_DRAWTEXT_CACHE: Optional[bool] = None
+
+
+def _has_drawtext() -> bool:
+    """True if this ffmpeg build registers the `drawtext` filter (needs
+    libfreetype). Some static builds omit it; we degrade gracefully when so."""
+    global _DRAWTEXT_CACHE
+    if _DRAWTEXT_CACHE is not None:
+        return _DRAWTEXT_CACHE
+    _DRAWTEXT_CACHE = False
+    try:
+        out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"],
+                             capture_output=True, timeout=30)
+        _DRAWTEXT_CACHE = b" drawtext " in out.stdout
+    except Exception:
+        _DRAWTEXT_CACHE = False
+    return _DRAWTEXT_CACHE
+
+
 def _probe_duration(path: str) -> Optional[float]:
     """Return the duration of an audio/video file in seconds, or None."""
     if not path or not os.path.exists(path) or not _has_ffprobe():
@@ -78,17 +97,27 @@ def _download(url: str, out_path: str, timeout: int = 60) -> Optional[str]:
 
 
 def _lower_third(text: str, palette) -> str:
-    """A drawtext + drawbox filter chain for a clean lower-third caption."""
-    txt = _escape_drawtext(_wrap(text, 42))
+    """A drawtext + drawbox filter chain for a clean lower-third caption.
+
+    Uses literal pixel coordinates (some ffmpeg builds reject `h*0.78`-style
+    expressions inside drawbox). If this build lacks `drawtext`, return just the
+    decorative band so the clip still renders; the spoken text is still conveyed
+    by the burned-in subtitles (libass), which is the priority.
+    """
+    band_y = int(HEIGHT * 0.78)          # 842 on 1080
+    band_h = HEIGHT - band_y             # 238
     accent = _hex_to_ffmpeg(palette.accent)
+    band = (f"drawbox=x=0:y={band_y}:w={WIDTH}:h={band_h}:color=0x000000@0.55:t=fill,"
+            f"drawbox=x=0:y={band_y}:w={WIDTH}:h=5:color={accent}:t=fill")
+    if not _has_drawtext():
+        return band + ",format=yuv420p"
+    txt = _escape_drawtext(_wrap(text, 42))
     textcol = _hex_to_ffmpeg(palette.text)
     return (
-        # translucent band along the bottom third
-        f"drawbox=x=0:y=h*0.78:w=iw:h=h*0.22:color=0x000000@0.55:t=fill,"
-        f"drawbox=x=0:y=h*0.78:w=iw:h=5:color={accent}:t=fill,"
+        band + ","
         f"drawtext=text='{txt}'{_font_clause()}:fontcolor={textcol}:fontsize=52:"
-        f"x=(w-text_w)/2:y=h*0.83:line_spacing=10:"
-        f"shadowcolor=0x000000:shadowx=3:shadowy=3"
+        f"x=(w-text_w)/2:y={int(HEIGHT * 0.83)}:line_spacing=10:"
+        f"shadowcolor=0x000000:shadowx=3:shadowy=3,format=yuv420p"
     )
 
 
@@ -129,7 +158,7 @@ def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
         vf = (
             f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
             f"crop={WIDTH}:{HEIGHT},"
-            f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000@0.30:t=fill,"
+            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color=0x000000@0.30:t=fill,"
             + lower
         )
         cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg, "-t", f"{duration}",
@@ -138,25 +167,26 @@ def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
     elif bg:
         # Still image with a slow Ken-Burns zoom.
         vf = (
-            f"scale={WIDTH*2}:-1,"
+            f"scale={WIDTH * 2}:-1,"
             f"zoompan=z='min(zoom+0.0008,1.12)':d={frames}:"
             f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={WIDTH}x{HEIGHT}:fps={FPS},"
-            f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000@0.35:t=fill,"
+            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color=0x000000@0.35:t=fill,"
             + lower
         )
         cmd = ["ffmpeg", "-y", "-loop", "1", "-i", bg, "-t", f"{duration}",
                "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p", out]
     else:
-        # On-brand gradient card with a subtle zoom — no external assets needed.
-        base = _hex_to_ffmpeg(p.bg if idx % 2 == 0 else p.bg2)
-        vf = (
-            f"zoompan=z='min(zoom+0.0006,1.10)':d={frames}:"
-            f"s={WIDTH}x{HEIGHT}:fps={FPS},"
-            + lower
-        )
-        cmd = ["ffmpeg", "-y", "-f", "lavfi",
-               "-i", f"color=c={base}:s={WIDTH}x{HEIGHT}:d={duration}:r={FPS}",
-               "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-t", f"{duration}", out]
+        # On-brand gradient card — no external assets needed. Use the `gradients`
+        # SOURCE filter (works reliably across builds; zoompan on a synthetic
+        # source errors on some ffmpeg versions, so we keep it static).
+        base = _hex_to_ffmpeg(p.bg)
+        base2 = _hex_to_ffmpeg(p.bg2 if idx % 2 == 0 else p.accent2 if hasattr(p, "accent2") else p.bg2)
+        src = (f"gradients=s={WIDTH}x{HEIGHT}:c0={base}:c1={base2}:"
+               f"x0=0:y0=0:x1={WIDTH}:y1={HEIGHT}:d={duration}:r={FPS}")
+        vf = lower  # lower already ends with format=yuv420p
+        cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", src,
+               "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
+               "-t", f"{duration}", out]
 
     subprocess.run(cmd, check=True, capture_output=True)
     return out
@@ -195,20 +225,130 @@ def _resynced_srt(scenes_durations: List[tuple], tmp: str) -> str:
 
 
 def _burn_subtitles(video: str, srt_path: str, tmp: str) -> str:
+    """Hard-burn captions using the libass `subtitles` filter (independent of
+    drawtext, so this works even on builds without libfreetype). The input
+    `video` has no audio yet, so no audio handling is needed here."""
     out = os.path.join(tmp, "video_subs.mp4")
     style = ("FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
              "BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=60")
+    # ffmpeg's subtitles filter parses ':' inside the path; escape it.
     srt_escaped = srt_path.replace("\\", "/").replace(":", "\\:")
     try:
         subprocess.run(
             ["ffmpeg", "-y", "-i", video,
              "-vf", f"subtitles='{srt_escaped}':force_style='{style}'",
-             "-c:a", "copy", out],
+             "-c:v", "libx264", "-pix_fmt", "yuv420p", out],
             check=True, capture_output=True,
         )
-        return out
+        return out if os.path.exists(out) else video
     except subprocess.CalledProcessError:
-        return video  # best-effort
+        return video  # best-effort: ship the video without burned captions
+
+
+# --------------------------------------------------------------------------- #
+# Thumbnail
+# --------------------------------------------------------------------------- #
+
+THUMB_W, THUMB_H = 1280, 720  # YouTube's recommended thumbnail size
+
+
+def _pick_overlay(kit: ContentKit, brand: Brand) -> str:
+    """Choose the short, punchy overlay phrase for the thumbnail."""
+    overlays = getattr(brand, "thumbnail_overlays", None) or []
+    if overlays:
+        seed = sum(ord(c) for c in kit.topic)
+        return overlays[seed % len(overlays)]
+    # Fallback: first two impactful words of the title, upper-cased.
+    words = [w for w in kit.title.split() if len(w) > 2][:2]
+    return (" ".join(words) or kit.title[:14]).upper()
+
+
+def _thumb_background(kit: ContentKit, tmp: str) -> Optional[str]:
+    """Landscape background art for the thumbnail (AI if available, else None)."""
+    img = auto_image()
+    if getattr(img, "name", "") != "offline-gradient":
+        out = os.path.join(tmp, "thumb_bg.png")
+        # Bias the prompt toward the niche mood for a cohesive cover.
+        made = img.background(f"{kit.topic}, dramatic cinematic, dark moody", out)
+        if made:
+            return made
+    return None
+
+
+def render_thumbnail(kit: ContentKit, out_path: str,
+                     brand: Optional[Brand] = None) -> RenderResult:
+    """Generate a 1280x720 thumbnail.jpg: bold overlay text over AI art or an
+    on-brand gradient. Best-effort; returns ok=False with a message on failure."""
+    if not has_ffmpeg():
+        return RenderResult(ok=False, path=None,
+                            message="ffmpeg not found — thumbnail not generated.")
+    brand = brand or get_brand(kit.brand_key)
+    p = brand.palette
+    overlay = _pick_overlay(kit, brand)
+    main = _escape_drawtext(_wrap(overlay, 16))
+    series = _escape_drawtext((kit.series_name or brand.display_name).upper())
+    accent = _hex_to_ffmpeg(p.accent)
+    accent2 = _hex_to_ffmpeg(getattr(p, "accent2", p.accent))
+    textcol = _hex_to_ffmpeg(p.text)
+
+    tmp = tempfile.mkdtemp(prefix="vpthumb_")
+    try:
+        bg = _thumb_background(kit, tmp)
+        has_text = _has_drawtext()
+        # Big, bold, high-contrast title text with a heavy shadow; a left accent
+        # bar and a small series kicker. Reads clearly at small sizes on mobile.
+        # When drawtext is unavailable we still emit a styled background with the
+        # accent bar so the thumbnail is usable (text can be added in any editor).
+        text_layers = ""
+        if has_text:
+            text_layers = (
+                f",drawtext=text='{series}'{_font_clause()}:fontcolor={accent2}:fontsize=44:"
+                f"x=70:y=64:shadowcolor=0x000000:shadowx=2:shadowy=2"
+                f",drawtext=text='{main}'{_font_clause()}:fontcolor={textcol}:fontsize=150:"
+                f"x=70:y=(h-text_h)/2+30:line_spacing=12:"
+                f"shadowcolor=0x000000:shadowx=5:shadowy=5"
+            )
+        draw = (
+            # darken for text legibility
+            f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000@0.45:t=fill,"
+            # left accent bar
+            f"drawbox=x=0:y=0:w=18:h=ih:color={accent}:t=fill"
+            + text_layers
+        )
+        if bg:
+            vf = (f"scale={THUMB_W}:{THUMB_H}:force_original_aspect_ratio=increase,"
+                  f"crop={THUMB_W}:{THUMB_H}," + draw)
+            cmd = ["ffmpeg", "-y", "-i", bg, "-vf", vf, "-frames:v", "1", out_path]
+        else:
+            base = _hex_to_ffmpeg(p.bg)
+            base2 = _hex_to_ffmpeg(p.bg2)
+            # `gradients` is a source filter: use it as the lavfi INPUT, then
+            # draw text/boxes over it. (Falls back to a flat color below if an
+            # older ffmpeg lacks the gradients source.)
+            cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i",
+                   f"gradients=s={THUMB_W}x{THUMB_H}:c0={base}:c1={base2}:"
+                   f"x0=0:y0=0:x1={THUMB_W}:y1={THUMB_H}",
+                   "-frames:v", "1", "-vf", draw, out_path]
+        subprocess.run(cmd, check=True, capture_output=True)
+        if os.path.exists(out_path):
+            return RenderResult(ok=True, path=out_path,
+                                message=f"Thumbnail: {out_path} (overlay: \"{overlay}\").")
+        return RenderResult(ok=False, path=None, message="Thumbnail render produced no file.")
+    except subprocess.CalledProcessError:
+        # gradients filter may be unavailable on very old ffmpeg — retry flat.
+        try:
+            base = _hex_to_ffmpeg(p.bg)
+            cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i",
+                   f"color=c={base}:s={THUMB_W}x{THUMB_H}", "-frames:v", "1",
+                   "-vf", draw, out_path]
+            subprocess.run(cmd, check=True, capture_output=True)
+            return RenderResult(ok=True, path=out_path,
+                                message=f"Thumbnail (flat bg): {out_path}.")
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or b"").decode("utf-8", "ignore")[-300:]
+            return RenderResult(ok=False, path=None, message=f"Thumbnail failed: {detail}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def render_long_video(
@@ -216,14 +356,16 @@ def render_long_video(
     out_path: str,
     folder: Optional[str] = None,
     music_path: Optional[str] = None,
-    burn_captions: bool = False,
+    burn_captions: bool = True,
+    make_thumbnail: bool = True,
 ) -> RenderResult:
     """Assemble a long-form narrated MP4 from a (long-format) ContentKit.
 
     `folder` is the Video Pack folder; the voiceover is written into
     `<folder>/audio/`. If omitted, a temp folder is used for audio.
-    `burn_captions` is off by default — YouTube auto-captions from the audio and
-    most storytelling channels prefer a clean frame; pass True to hard-burn.
+    `burn_captions` defaults to True so the MP4 is a single, self-contained,
+    upload-ready file (captions baked in). `make_thumbnail` also writes a
+    matching `thumbnail.jpg` next to the video.
     """
     if getattr(kit, "format", "short") != "long":
         return RenderResult(ok=False, path=None,
@@ -292,12 +434,20 @@ def render_long_video(
                 "-shortest", out_path]
         subprocess.run(cmd, check=True, capture_output=True)
 
+        # 4) Matching thumbnail next to the video.
+        thumb_msg = ""
+        if make_thumbnail:
+            thumb_path = os.path.join(os.path.dirname(os.path.abspath(out_path)),
+                                      "thumbnail.jpg")
+            tres = render_thumbnail(kit, thumb_path, brand)
+            thumb_msg = f"  {tres.message}" if tres.ok else f"  (thumbnail skipped: {tres.message})"
+
         mins = (_probe_duration(out_path) or kit.total_seconds) / 60.0
-        cap = " + burned captions" if burn_captions else ""
+        cap = " + captions baked in" if burn_captions else ""
         return RenderResult(
             ok=True, path=out_path,
             message=(f"Rendered {out_path} ({WIDTH}x{HEIGHT} @ {FPS}fps, ~{mins:.1f} min, "
-                     f"voice: {narr.engine}{cap})."),
+                     f"voice: {narr.engine}{cap}).{thumb_msg}"),
         )
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or b"").decode("utf-8", "ignore")[-700:]

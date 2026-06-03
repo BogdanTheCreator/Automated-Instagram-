@@ -74,6 +74,9 @@ class Brand:
     title_templates: List[str] = field(default_factory=list)
     # Thumbnail concepts (mobile-first). {topic} is substituted if present.
     thumbnail_concepts: List[str] = field(default_factory=list)
+    # Short, punchy overlay phrases (<= ~4 words) actually rendered onto the
+    # generated thumbnail.jpg. High-contrast, curiosity-driving, not misleading.
+    thumbnail_overlays: List[str] = field(default_factory=list)
     # Default length (seconds) used when niche_kind == "story" and the caller
     # does not pass an explicit duration. 600s ~= 10 minutes.
     default_long_seconds: int = 600
@@ -449,6 +452,14 @@ _BETRAYAL_REVENGE = Brand(
         "Dark, cinematic, single light source.",
         "An empty chair at a dinner table with one place setting removed. Overlay "
         "\"NOT INVITED\". Moody, lots of negative space so it reads at thumbnail size.",
+    ],
+    thumbnail_overlays=[
+        "SHE LIED",
+        "I FOUND OUT",
+        "THE TRUTH",
+        "THEY HAD NO IDEA",
+        "TOO LATE",
+        "I STAYED QUIET",
     ],
     default_long_seconds=600,
 )

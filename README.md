@@ -147,15 +147,21 @@ explains how to enable it and nothing else is affected.
 
 Add `--render` to a long-form command to assemble a finished **landscape
 1920x1080 narrated video** — the visuals are timed to the actual voiceover, with
-a lower-third caption per beat and a slow Ken-Burns motion:
+a lower-third label per beat, slow Ken-Burns motion, and **captions baked in**:
 
 ```bash
 python3 -m social.cli "my husband's affair with my best friend" \
     --brand betrayal_revenge --render            # voiceover is generated automatically
 ```
 
-This writes **`video.mp4`** into the pack folder, ready to upload (pair it with a
-thumbnail from `thumbnails.md` and the metadata in `seo.md`). Backgrounds use:
+This writes two files into the pack folder, ready to publish after a quick
+lookover:
+
+- **`video.mp4`** — a single self-contained video with captions baked in, and
+- **`thumbnail.jpg`** — a matching 1280x720 thumbnail with a bold overlay.
+
+Just pair them with the title/description/tags in `seo.md` and upload.
+Backgrounds use:
 
 - real **stock footage/photos** if `PEXELS_API_KEY` is set,
 - **AI background art** if `OPENAI_API_KEY` is set, otherwise
@@ -163,12 +169,13 @@ thumbnail from `thumbnails.md` and the metadata in `seo.md`). Backgrounds use:
 
 Requires `ffmpeg` on PATH (`brew install ffmpeg` / `apt-get install -y ffmpeg` /
 `winget install Gyan.FFmpeg`). Without it, the full pack + voiceover text are
-still produced and you get a clear message. Captions are left off the frame by
-default (YouTube auto-captions from the audio); add `--burn-captions` to hard-burn
-them. The complete flow from a topic to an uploadable file is:
+still produced and you get a clear message. Captions are **burned in by default**
+so the MP4 is fully self-contained; pass `--no-captions` for a clean frame
+(YouTube can still auto-caption from the audio), or `--no-thumbnail` to skip the
+image. The complete flow from a topic to upload-ready files is:
 
 ```bash
-# topic -> script + SEO + thumbnails + voiceover + video.mp4
+# topic -> script + SEO + voiceover + video.mp4 (captions in) + thumbnail.jpg
 python3 -m social.cli "a sibling who stole an inheritance" \
     --brand betrayal_revenge --render
 ```
@@ -179,10 +186,11 @@ python3 -m social.cli "a sibling who stole an inheritance" \
 runs **every Monday at 08:00 UTC** (and on-demand from the **Actions** tab). It
 writes the opportunity report + a full Video Pack for the week's top topic,
 **synthesizes the narration to MP3** and **assembles the upload-ready
-`video.mp4`** (free edge-tts + ffmpeg are installed in the run), then uploads
-everything as a **downloadable artifact**. It publishes nothing, so you keep
-human control of the final thumbnail and upload. Set `OPENAI_API_KEY` for full
-written narration and `PEXELS_API_KEY` for real stock-footage backgrounds. The
+`video.mp4` (captions baked in) + `thumbnail.jpg`** (free edge-tts + ffmpeg are
+installed in the run), then uploads everything as a **downloadable artifact**. It
+publishes nothing, so you keep human control of the final lookover and upload.
+Set `OPENAI_API_KEY` for full written narration and `PEXELS_API_KEY` for real
+stock-footage backgrounds. The
 MP4 render is the heaviest step — untick the **render** input on a manual run for
 a fast text+audio-only bundle.
 
