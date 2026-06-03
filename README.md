@@ -172,11 +172,18 @@ lookover:
 - **`thumbnail.jpg`** — a matching 1280x720 thumbnail with a bold overlay.
 
 Just pair them with the title/description/tags in `seo.md` and upload.
-Backgrounds use:
+Each story beat shows **relevant imagery of what's being narrated**, picked per
+beat from its b-roll search terms:
 
-- real **stock footage/photos** if `PEXELS_API_KEY` is set,
+- a short **slideshow of free Pexels photos** (a fresh image every ~5s, with a
+  slow Ken-Burns motion) if `PEXELS_API_KEY` is set — this is the recommended
+  free option and the easiest way to make the video look engaging,
 - **AI background art** if `OPENAI_API_KEY` is set, otherwise
 - clean **on-brand gradient cards** (no keys, always works).
+
+A [Pexels API key](https://www.pexels.com/api/) is **free** — create one and add
+it as the `PEXELS_API_KEY` repo secret (or env var) to turn the plain gradient
+backgrounds into real pictures.
 
 Requires `ffmpeg` on PATH (`brew install ffmpeg` / `apt-get install -y ffmpeg` /
 `winget install Gyan.FFmpeg`). Without it, the full pack + voiceover text are
