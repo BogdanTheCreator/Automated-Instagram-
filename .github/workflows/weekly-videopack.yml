@@ -6,17 +6,21 @@
 #      title options, full 8-12 min narration script, SEO upload pack (description,
 #      tags, chapters, pinned comment), thumbnail concepts and promotion ideas.
 #   3. Synthesizes the narration to MP3 (free edge-tts, or ElevenLabs if a key is
-#      set) — per-beat clips plus a combined narration.mp3 in the pack's audio/ folder.
+#      set) and assembles an upload-ready landscape MP4 (visuals + voiceover) with
+#      ffmpeg — written to the pack's video.mp4 (audio/ holds the voice clips too).
 #   4. Uploads everything as a downloadable artifact you review before producing.
 #
-# This needs no API keys and uses few CI minutes. Nothing is published, so you
-# stay in control of the final thumbnail, video assembly and upload (supervised
-# automation).
+# This needs no API keys and uses a modest amount of CI minutes (the MP4 render
+# is the heaviest step; turn it off with the `render` input for a fast, text+audio
+# only run). Nothing is published, so you stay in control of the final thumbnail
+# and upload (supervised automation).
 #
 # OPTIONAL SECRET (GitHub -> Settings -> Secrets and variables -> Actions):
 #   OPENAI_API_KEY  -> writes the topic ideas + full narration with an LLM.
 #                      Without it you still get a complete, editable beat-sheet
 #                      scaffold for free.
+#   PEXELS_API_KEY  -> use real stock footage/photos as backgrounds in the MP4.
+#                      Without it the video uses clean on-brand gradient cards.
 # OPTIONAL VARIABLE:
 #   BRAND  -> defaults to betrayal_revenge (the niche this channel is built for).
 
@@ -31,6 +35,10 @@ on:
       topic:
         description: "Optional: force a specific topic (leave blank to auto-pick the week's best)"
         default: ""
+      render:
+        description: "Assemble an upload-ready MP4 (slower). Uncheck for text+audio only."
+        type: boolean
+        default: true
   schedule:
     # 08:00 UTC every Monday. Edit the time/day to change the cadence.
     - cron: "0 8 * * 1"
@@ -63,20 +71,26 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
           pip install -q edge-tts
 
-      - name: Generate the weekly opportunity report + Video Pack (with voiceover)
+      - name: Generate the weekly opportunity report + Video Pack (with voiceover + MP4)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
           BRAND="${{ github.event.inputs.brand }}"
           [ -z "$BRAND" ] && BRAND="${{ vars.BRAND }}"
           [ -z "$BRAND" ] && BRAND="betrayal_revenge"
           TOPIC="${{ github.event.inputs.topic }}"
-          echo "Using brand: $BRAND"
+          # Render defaults to on. Scheduled runs (empty input) render; manual
+          # runs honour the checkbox.
+          RENDER="${{ github.event.inputs.render }}"
+          RENDER_FLAG="--render"
+          [ "$RENDER" = "false" ] && RENDER_FLAG=""
+          echo "Using brand: $BRAND  (render: ${RENDER_FLAG:-off})"
           if [ -n "$TOPIC" ]; then
             echo "Forcing topic: $TOPIC"
-            python -m social.cli "$TOPIC" --brand "$BRAND" --long --voiceover --out weekly_out
+            python -m social.cli "$TOPIC" --brand "$BRAND" --long --voiceover $RENDER_FLAG --out weekly_out
           else
-            python -m social.cli --weekly --brand "$BRAND" --voiceover --out weekly_out
+            python -m social.cli --weekly --brand "$BRAND" --voiceover $RENDER_FLAG --out weekly_out
           fi
 
       - name: Print a quick summary to the run log
@@ -92,6 +106,13 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "### This week's Video Pack (preview)" >> "$GITHUB_STEP_SUMMARY"
             sed -n '1,30p' "$PACK" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          MP4="$(find weekly_out -name 'video.mp4' | head -1)"
+          if [ -n "$MP4" ]; then
+            SIZE="$(du -h "$MP4" | cut -f1)"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Upload-ready video" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`$MP4\` ($SIZE) — download the artifact, add a thumbnail, and upload." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload the weekly bundle as a downloadable artifact

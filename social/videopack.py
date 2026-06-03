@@ -174,14 +174,17 @@ def write_opportunities(brand_key: str, count: int = 10, out_root: str = "weekly
 
 def write_weekly(brand_key: str, out_root: str = "weekly_out",
                  seconds: int = 0, llm: Optional[LLMProvider] = None,
-                 voiceover: bool = False) -> str:
+                 voiceover: bool = False, render: bool = False,
+                 burn_captions: bool = False) -> str:
     """Produce the full weekly bundle:
 
         weekly_out/
           opportunities.md / .json     ranked 10-topic scan
           video-pack/<...>/             complete Video Pack for the #1 topic
-            audio/                      narration MP3s (only if voiceover=True
-                                        and a TTS engine is available)
+            audio/                      narration MP3s (if voiceover/render and a
+                                        TTS engine are available)
+            video.mp4                   upload-ready video (only if render=True
+                                        and ffmpeg is available)
           INDEX.md                      what's inside + next steps
     """
     os.makedirs(out_root, exist_ok=True)
@@ -196,7 +199,19 @@ def write_weekly(brand_key: str, out_root: str = "weekly_out",
 
     voiceover_line = ("3. Record/generate the voiceover (`voiceover.txt`), assemble visuals "
                       "(`shotlist.md`), then upload using `seo.md`.")
-    if voiceover:
+
+    if render:
+        # Rendering assembles the MP4 and produces the voiceover internally.
+        from .render_long import render_long_video
+        res = render_long_video(kit, os.path.join(pack_folder, "video.mp4"),
+                                folder=pack_folder, burn_captions=burn_captions)
+        if res.ok:
+            voiceover_line = ("3. **`video-pack/.../video.mp4` is ready to upload.** "
+                              "Add a thumbnail (`thumbnails.md`) and the metadata in "
+                              "`seo.md`, and publish.")
+        else:
+            voiceover_line += (f"\n   _(Auto-render skipped: {res.message.splitlines()[0]})_")
+    elif voiceover:
         from .narration import synthesize_narration
         res = synthesize_narration(kit, pack_folder)
         if res.ok:
