@@ -525,10 +525,108 @@ class PexelsPhotos:
             return []
 
 
+_PHOTO_UA = "faceless-video-bot/1.0 (https://github.com/; educational use)"
+
+
+class OpenversePhotos:
+    """Free stock photos via the Openverse API (https://api.openverse.org/) —
+    NO API KEY required. Aggregates openly-licensed images (Flickr, museums,
+    etc.). Good general coverage for emotive/scene imagery."""
+    name = "openverse"
+
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        per_page = max(1, min(20, count * 3))  # over-fetch; we filter for quality
+        url = (f"https://api.openverse.org/v1/images/"
+               f"?q={urllib.request.quote(query)}&page_size={per_page}"
+               f"&aspect_ratio=wide&mature=false")
+        req = urllib.request.Request(url, headers={"User-Agent": _PHOTO_UA,
+                                                   "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            urls: List[str] = []
+            for r in data.get("results", []):
+                link = r.get("url") or ""
+                if link.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
+                    urls.append(link)
+                if len(urls) >= count:
+                    break
+            return urls
+        except Exception:
+            return []
+
+
+class WikimediaPhotos:
+    """Free images via Wikimedia Commons (NO API KEY). Reliable hotlinkable
+    thumbnail URLs; quality varies, so used as a last-resort no-key fallback.
+    Restricted to JPEGs to avoid document/diagram scans."""
+    name = "wikimedia"
+
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        api = ("https://commons.wikimedia.org/w/api.php?action=query&format=json"
+               "&generator=search&gsrnamespace=6"
+               f"&gsrsearch={urllib.request.quote(query)}&gsrlimit={max(count*2, 6)}"
+               "&prop=imageinfo&iiprop=url|mime&iiurlwidth=1600")
+        req = urllib.request.Request(api, headers={"User-Agent": _PHOTO_UA})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            pages = list((data.get("query", {}) or {}).get("pages", {}).values())
+            # Keep API result order (relevance) where possible.
+            pages.sort(key=lambda p: p.get("index", 999))
+            urls: List[str] = []
+            for p in pages:
+                ii = (p.get("imageinfo") or [{}])[0]
+                if ii.get("mime") != "image/jpeg":
+                    continue
+                u = ii.get("thumburl") or ii.get("url")
+                if u:
+                    urls.append(u)
+                if len(urls) >= count:
+                    break
+            return urls
+        except Exception:
+            return []
+
+
+class TieredPhotos:
+    """Try several photo sources in priority order, returning the first that
+    yields images for a query. Records `last_source` for diagnostics."""
+    name = "tiered"
+
+    def __init__(self, providers: List[PhotoProvider]) -> None:
+        self._providers = providers
+        self.last_source = "none"
+
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        for prov in self._providers:
+            try:
+                urls = prov.search(query, count=count, orientation=orientation)
+            except Exception:
+                urls = []
+            if urls:                       # advance to next source on empty too
+                self.last_source = prov.name
+                return urls
+        self.last_source = "none"
+        return []
+
+
 def auto_photos() -> PhotoProvider:
+    """Pick the best available photo source. Pexels first (highest quality, free
+    key), then NO-KEY sources (Openverse, then Wikimedia) so relevant imagery
+    appears out of the box without any setup. Disable network image lookup with
+    NO_STOCK_IMAGES=1 (forces gradient cards)."""
+    if os.getenv("NO_STOCK_IMAGES"):
+        return OfflinePhotos()
+    tier: List[PhotoProvider] = []
     if os.getenv("PEXELS_API_KEY"):
-        return PexelsPhotos()
-    return OfflinePhotos()
+        tier.append(PexelsPhotos())
+    tier.append(OpenversePhotos())
+    tier.append(WikimediaPhotos())
+    return TieredPhotos(tier)
 
 
 
