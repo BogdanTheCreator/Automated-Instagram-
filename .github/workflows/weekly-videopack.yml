@@ -64,11 +64,12 @@ jobs:
 
       - name: Install voiceover + audio tools (free, no API key)
         run: |
-          # edge-tts gives free neural voices; ffmpeg merges the per-beat clips
-          # into a single narration.mp3. Both are optional — the pack is still
-          # produced without them.
+          # edge-tts gives free neural voices; ffmpeg builds the video and merges
+          # the per-beat clips into narration.mp3. The DejaVu font lets ffmpeg's
+          # drawtext render the on-screen beat labels + thumbnail text. All
+          # optional — the pack is still produced without them.
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
           pip install -q edge-tts
 
       - name: Generate the weekly opportunity report + Video Pack (with voiceover + MP4)

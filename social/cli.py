@@ -129,10 +129,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output root folder (default ./content_kits).")
     p.add_argument("--render", action="store_true",
                    help="Also render an MP4 (requires ffmpeg). Short-form -> vertical "
-                        "Reel; long-form Video Pack -> landscape narrated YouTube video.")
-    p.add_argument("--burn-captions", action="store_true",
-                   help="For long-form --render: hard-burn captions into the video "
-                        "(default off; YouTube can auto-caption from the audio).")
+                        "Reel; long-form Video Pack -> a single upload-ready landscape "
+                        "video.mp4 (captions baked in) + a matching thumbnail.jpg.")
+    p.add_argument("--no-captions", action="store_true",
+                   help="For long-form --render: do NOT bake captions into the video "
+                        "(default bakes them in for a self-contained file).")
+    p.add_argument("--no-thumbnail", action="store_true",
+                   help="For long-form --render: skip generating thumbnail.jpg.")
     p.add_argument("--music", default=None, help="Path to background music for --render.")
     p.add_argument("--no-voiceover", action="store_true",
                    help="Skip TTS voiceover when rendering.")
@@ -209,20 +212,25 @@ def _maybe_voiceover(args, kit, folder) -> None:
 
 
 def _maybe_render_long(args, kit, folder) -> None:
-    """If --render was requested for a long-form pack, assemble the MP4 (visuals
-    + voiceover + optional burned captions) into the pack folder. Never raises."""
+    """If --render was requested for a long-form pack, assemble a single
+    self-contained MP4 (visuals + voiceover + baked-in captions) plus a matching
+    thumbnail.jpg into the pack folder. Never raises."""
     if not getattr(args, "render", False):
         return
     from .render_long import render_long_video
     mp4 = os.path.join(folder, "video.mp4")
     result = render_long_video(
         kit, mp4, folder=folder, music_path=args.music,
-        burn_captions=getattr(args, "burn_captions", False),
+        burn_captions=not getattr(args, "no_captions", False),
+        make_thumbnail=not getattr(args, "no_thumbnail", False),
     )
     print("\n  Render:", result.message)
     if result.ok:
         print(f"    Upload-ready video: {result.path}")
-        print("    Pair it with a thumbnail from thumbnails.md and the metadata in seo.md.")
+        thumb = os.path.join(folder, "thumbnail.jpg")
+        if os.path.exists(thumb):
+            print(f"    Thumbnail        : {thumb}")
+        print("    Give it a lookover, then upload with the title/description from seo.md.")
 
 
 def _run_videopack(args) -> int:
@@ -258,7 +266,8 @@ def _run_weekly(args) -> int:
         folder = write_weekly(args.brand, out_root=out, seconds=_resolve_seconds(args),
                               voiceover=getattr(args, "voiceover", False),
                               render=getattr(args, "render", False),
-                              burn_captions=getattr(args, "burn_captions", False))
+                              burn_captions=not getattr(args, "no_captions", False),
+                              make_thumbnail=not getattr(args, "no_thumbnail", False))
     except (KeyError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

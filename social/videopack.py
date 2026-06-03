@@ -175,7 +175,7 @@ def write_opportunities(brand_key: str, count: int = 10, out_root: str = "weekly
 def write_weekly(brand_key: str, out_root: str = "weekly_out",
                  seconds: int = 0, llm: Optional[LLMProvider] = None,
                  voiceover: bool = False, render: bool = False,
-                 burn_captions: bool = False) -> str:
+                 burn_captions: bool = True, make_thumbnail: bool = True) -> str:
     """Produce the full weekly bundle:
 
         weekly_out/
@@ -183,8 +183,9 @@ def write_weekly(brand_key: str, out_root: str = "weekly_out",
           video-pack/<...>/             complete Video Pack for the #1 topic
             audio/                      narration MP3s (if voiceover/render and a
                                         TTS engine are available)
-            video.mp4                   upload-ready video (only if render=True
-                                        and ffmpeg is available)
+            video.mp4                   self-contained upload-ready video with
+                                        captions baked in (if render=True + ffmpeg)
+            thumbnail.jpg               matching 1280x720 thumbnail (if render=True)
           INDEX.md                      what's inside + next steps
     """
     os.makedirs(out_root, exist_ok=True)
@@ -201,14 +202,16 @@ def write_weekly(brand_key: str, out_root: str = "weekly_out",
                       "(`shotlist.md`), then upload using `seo.md`.")
 
     if render:
-        # Rendering assembles the MP4 and produces the voiceover internally.
+        # Rendering assembles the MP4 (captions baked in) + thumbnail and
+        # produces the voiceover internally.
         from .render_long import render_long_video
         res = render_long_video(kit, os.path.join(pack_folder, "video.mp4"),
-                                folder=pack_folder, burn_captions=burn_captions)
+                                folder=pack_folder, burn_captions=burn_captions,
+                                make_thumbnail=make_thumbnail)
         if res.ok:
-            voiceover_line = ("3. **`video-pack/.../video.mp4` is ready to upload.** "
-                              "Add a thumbnail (`thumbnails.md`) and the metadata in "
-                              "`seo.md`, and publish.")
+            voiceover_line = ("3. **Everything is rendered:** `video-pack/.../video.mp4` "
+                              "(captions baked in) and `thumbnail.jpg`. Give it a "
+                              "lookover, then upload with the title/description in `seo.md`.")
         else:
             voiceover_line += (f"\n   _(Auto-render skipped: {res.message.splitlines()[0]})_")
     elif voiceover:
