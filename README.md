@@ -172,18 +172,25 @@ lookover:
 - **`thumbnail.jpg`** — a matching 1280x720 thumbnail with a bold overlay.
 
 Just pair them with the title/description/tags in `seo.md` and upload.
-Each story beat shows **relevant imagery of what's being narrated**, picked per
-beat from its b-roll search terms:
+Each story beat shows **relevant imagery of what's being narrated** (a short
+slideshow with a slow Ken-Burns motion, a fresh image every ~5s), pulled per
+beat in this priority order:
 
-- a short **slideshow of free Pexels photos** (a fresh image every ~5s, with a
-  slow Ken-Burns motion) if `PEXELS_API_KEY` is set — this is the recommended
-  free option and the easiest way to make the video look engaging,
-- **AI background art** if `OPENAI_API_KEY` is set, otherwise
-- clean **on-brand gradient cards** (no keys, always works).
+- **Pexels** photos if `PEXELS_API_KEY` is set — highest quality, free key,
+- **Openverse** (openly-licensed images) — **no API key required**, used by default,
+- **Wikimedia Commons** — **no key**, fallback,
+- **AI background art** if `OPENAI_API_KEY` is set,
+- clean **on-brand gradient cards** as the last resort.
 
-A [Pexels API key](https://www.pexels.com/api/) is **free** — create one and add
-it as the `PEXELS_API_KEY` repo secret (or env var) to turn the plain gradient
-backgrounds into real pictures.
+This means real per-beat pictures appear **out of the box, with no setup**. For
+the most consistent, highest-quality imagery, a free
+[Pexels API key](https://www.pexels.com/api/) added as the `PEXELS_API_KEY` repo
+secret is recommended. To force gradient cards (e.g. offline), set
+`NO_STOCK_IMAGES=1`.
+
+Every render also writes a **`RENDER_LOG.md`** next to the video showing, per
+beat, the exact search query and which image source was used (or why it fell
+back to a gradient) — so you can see at a glance whether imagery was fetched.
 
 Requires `ffmpeg` on PATH (`brew install ffmpeg` / `apt-get install -y ffmpeg` /
 `winget install Gyan.FFmpeg`). Without it, the full pack + voiceover text are

@@ -127,29 +127,42 @@ def _lower_third(text: str, palette, draw_label: bool = True) -> str:
     )
 
 
-def _beat_images(query: str, idx: int, tmp: str, want: int) -> List[str]:
+def _beat_images(query: str, idx: int, tmp: str, want: int):
     """Fetch up to `want` relevant still images for a beat, in priority order:
 
-      1. Free Pexels photos (several distinct images -> a slideshow per beat).
+      1. Stock photos (Pexels if keyed, else no-key Openverse/Wikimedia) — the
+         main path for "show what's being talked about".
       2. A single AI-generated image (OPENAI_API_KEY).
       3. A frame grabbed from a Pexels stock video.
 
-    Returns a list of local image file paths (possibly empty -> caller uses the
-    on-brand gradient card). All best-effort; never raises.
+    Returns (paths, source): a list of local image file paths (possibly empty ->
+    caller uses the on-brand gradient card) and a short source label for
+    diagnostics. All best-effort; never raises.
     """
     want = max(1, want)
     paths: List[str] = []
 
-    # 1) Pexels photos — the main path for "show what's being talked about".
+    # 1) Stock photos. Works with ANY non-offline provider (incl. the tiered
+    #    no-key sources), not just Pexels — this is what makes images appear
+    #    out of the box.
     photos = auto_photos()
-    if getattr(photos, "name", "") == "pexels-photos":
-        urls = photos.search(query, count=want, orientation="landscape")
-        for j, url in enumerate(urls):
-            dst = os.path.join(tmp, f"img_{idx:03d}_{j:02d}.jpg")
-            if _download(url, dst):
-                paths.append(dst)
-        if paths:
-            return paths
+    if getattr(photos, "name", "") != "offline-none":
+        tried = [query] + [q for q in _FALLBACK_QUERIES if q != query]
+        for attempt in tried:
+            try:
+                urls = photos.search(attempt, count=want, orientation="landscape")
+            except Exception:
+                urls = []
+            for j, url in enumerate(urls):
+                dst = os.path.join(tmp, f"img_{idx:03d}_{j:02d}.jpg")
+                if _download(url, dst):
+                    paths.append(dst)
+            if paths:
+                src = getattr(photos, "last_source", getattr(photos, "name", "photos"))
+                # Note when we had to use a generic fallback query.
+                if attempt != query:
+                    src = f"{src}~"
+                return paths, src
 
     # 2) AI background art (single image).
     img = auto_image()
@@ -157,7 +170,7 @@ def _beat_images(query: str, idx: int, tmp: str, want: int) -> List[str]:
         dst = os.path.join(tmp, f"img_{idx:03d}_ai.png")
         made = img.background(query, dst)
         if made:
-            return [made]
+            return [made], "ai-image"
 
     # 3) Stock video frame as a still.
     stock = auto_stock()
@@ -171,10 +184,10 @@ def _beat_images(query: str, idx: int, tmp: str, want: int) -> List[str]:
                     subprocess.run(["ffmpeg", "-y", "-i", vid, "-frames:v", "1", frame],
                                    check=True, capture_output=True, timeout=60)
                     if os.path.exists(frame):
-                        return [frame]
+                        return [frame], "pexels-video-frame"
                 except Exception:
                     pass
-    return paths
+    return paths, "gradient"
 
 
 def _accepts_orientation(stock) -> bool:
@@ -210,12 +223,14 @@ def _kenburns_clip(image: str, duration: float, idx: int, sub: int,
 
 
 def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
-                brand: Brand, tmp: str, draw_label: bool = False) -> str:
-    """Render one beat to an intermediate landscape mp4 and return its path.
+                brand: Brand, tmp: str, draw_label: bool = False):
+    """Render one beat to an intermediate landscape mp4.
 
     If relevant images are available, the beat becomes a short slideshow of
     those images (one Ken-Burns sub-clip each), so viewers see pictures of what
     is being narrated. Otherwise it falls back to an on-brand gradient card.
+
+    Returns (out_path, source_label) for diagnostics.
     """
     p = brand.palette
     out = os.path.join(tmp, f"beat_{idx:03d}.mp4")
@@ -224,30 +239,33 @@ def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
 
     # Aim for one fresh image roughly every ~5s of narration (min 1, cap 4).
     want = max(1, min(4, int(math.ceil(duration / 5.0))))
-    images = _beat_images(query, idx, tmp, want)
+    images, source = _beat_images(query, idx, tmp, want)
 
     if images:
         # Split the beat duration evenly across the available images and build a
         # Ken-Burns clip for each, then concatenate them into the beat clip.
         n = len(images)
         per = max(1.5, round(duration / n, 2))
-        subclips = [
-            _kenburns_clip(img, per, idx, j, lower, tmp)
-            for j, img in enumerate(images)
-        ]
-        if len(subclips) == 1:
-            shutil.move(subclips[0], out)
-        else:
-            beat_list = os.path.join(tmp, f"beat_{idx:03d}.txt")
-            with open(beat_list, "w", encoding="utf-8") as fh:
-                for c in subclips:
-                    fh.write(f"file '{os.path.abspath(c)}'\n")
-            subprocess.run(
-                ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", beat_list,
-                 "-c", "copy", out],
-                check=True, capture_output=True,
-            )
-        return out
+        subclips = []
+        for j, img in enumerate(images):
+            try:
+                subclips.append(_kenburns_clip(img, per, idx, j, lower, tmp))
+            except subprocess.CalledProcessError:
+                continue  # skip a bad image rather than fail the whole beat
+        if subclips:
+            if len(subclips) == 1:
+                shutil.move(subclips[0], out)
+            else:
+                beat_list = os.path.join(tmp, f"beat_{idx:03d}.txt")
+                with open(beat_list, "w", encoding="utf-8") as fh:
+                    for c in subclips:
+                        fh.write(f"file '{os.path.abspath(c)}'\n")
+                subprocess.run(
+                    ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", beat_list,
+                     "-c", "copy", out],
+                    check=True, capture_output=True,
+                )
+            return out, f"{source}x{len(subclips)}"
 
     # Fallback: on-brand gradient card (no external assets). Use the `gradients`
     # SOURCE filter (zoompan on a synthetic source errors on some ffmpeg builds).
@@ -260,7 +278,7 @@ def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
            "-vf", lower, "-c:v", "libx264", "-pix_fmt", "yuv420p",
            "-t", f"{duration}", out]
     subprocess.run(cmd, check=True, capture_output=True)
-    return out
+    return out, "gradient"
 
 
 def _concat(clips: List[str], tmp: str) -> str:
@@ -422,6 +440,83 @@ def render_thumbnail(kit: ContentKit, out_path: str,
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --------------------------------------------------------------------------- #
+# Per-beat image search queries + diagnostics
+# --------------------------------------------------------------------------- #
+
+# Stock libraries respond far better to concrete, cinematic scene descriptions
+# than to abstract phrases like "a sibling who stole an inheritance". Map each
+# story-arc beat role to a visually-searchable term. (Roles come from
+# engine.STORY_ARC.) Falls back to the scene's own b-roll query / topic.
+_BEAT_QUERY_BY_ROLE = {
+    "hook":          "dark cinematic silhouette",
+    "setup":         "quiet home morning light",
+    "trust":         "friends laughing together",
+    "first_crack":   "smartphone screen night",
+    "suspicion":     "rainy window",
+    "betrayal":      "rain window night",
+    "fallout":       "empty room lamp",
+    "decision":      "serious eyes closeup",
+    "plan":          "documents desk",
+    "escalation":    "dinner table candlelight",
+    "turning_point": "empty meeting room",
+    "payoff":        "open door daylight",
+    "aftermath":     "walking away street sunset",
+    "reflection":    "calm sunrise horizon",
+    "cta":           "dark moody background",
+    # short-form/value roles (harmless if unused here):
+    "context":       "cinematic establishing shot",
+    "point":         "abstract background",
+}
+
+# Generic, high-recall fallbacks tried (in order) when a beat's specific query
+# returns nothing — so beats almost always get a relevant-ish image rather than
+# a flat gradient.
+_FALLBACK_QUERIES = ["cinematic moody", "dark abstract background", "night city lights"]
+
+
+def _beat_query(scene, topic: str) -> str:
+    """Pick a visually-searchable query for a beat: curated by role first, then
+    the scene's own b-roll phrase, then the topic."""
+    role = getattr(scene, "role", "") or ""
+    curated = _BEAT_QUERY_BY_ROLE.get(role)
+    if curated:
+        return curated
+    return getattr(scene, "broll_query", "") or topic
+
+
+def _write_render_log(out_path: str, kit: ContentKit, sources, img_beats: int,
+                      total: int) -> None:
+    """Write RENDER_LOG.md next to the video so the user can SEE, per beat,
+    which image source was used (or why it fell back to a gradient)."""
+    folder = os.path.dirname(os.path.abspath(out_path))
+    lines = [
+        f"# Render log — {kit.title}",
+        "",
+        f"**Imagery:** {img_beats} of {total} beats used real stock photos; "
+        f"{total - img_beats} fell back to gradient cards.",
+        "",
+    ]
+    if img_beats == 0:
+        lines += [
+            "> No stock images were fetched for any beat. Likely causes:",
+            "> - No network access during the run, or the image sources were rate-limited.",
+            "> - `NO_STOCK_IMAGES` is set.",
+            "> Set `PEXELS_API_KEY` (free) for the most reliable, highest-quality images.",
+            "",
+        ]
+    lines += ["| # | Beat | Search query | Image source |",
+              "|---|------|--------------|--------------|"]
+    for i, (role, query, src) in enumerate(sources):
+        lines.append(f"| {i} | {role} | {query} | {src} |")
+    lines.append("")
+    try:
+        with open(os.path.join(folder, "RENDER_LOG.md"), "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines))
+    except OSError:
+        pass
+
+
 def render_long_video(
     kit: ContentKit,
     out_path: str,
@@ -476,7 +571,7 @@ def render_long_video(
 
     tmp = tempfile.mkdtemp(prefix="vplong_")
     try:
-        clips, srt_rows = [], []
+        clips, srt_rows, sources = [], [], []
         # If we're burning narration captions, don't also draw the per-beat
         # section label (that would stack two text layers = "double captions").
         # When captions are off, the label becomes the single on-screen text.
@@ -484,10 +579,16 @@ def render_long_video(
         for i, (scene, audio_part) in enumerate(pairs):
             dur = _probe_duration(audio_part) or max(2.0, scene.duration)
             label = scene.on_screen or scene.role.title()
-            query = getattr(scene, "broll_query", "") or kit.topic
-            clips.append(_scene_clip(i, label, dur, query, brand, tmp,
-                                     draw_label=draw_label))
+            query = _beat_query(scene, kit.topic)
+            clip, src = _scene_clip(i, label, dur, query, brand, tmp,
+                                    draw_label=draw_label)
+            clips.append(clip)
+            sources.append((getattr(scene, "role", f"beat{i}"), query, src))
             srt_rows.append((scene.narration, dur))
+
+        # Diagnostics: write a render log + count how many beats got real images.
+        img_beats = sum(1 for _, _, s in sources if s != "gradient")
+        _write_render_log(out_path, kit, sources, img_beats, len(sources))
 
         video = _concat(clips, tmp)
 
@@ -520,10 +621,13 @@ def render_long_video(
 
         mins = (_probe_duration(out_path) or kit.total_seconds) / 60.0
         cap = " + captions baked in" if burn_captions else ""
+        imagery = (f"imagery: {img_beats}/{len(sources)} beats from stock photos"
+                   if img_beats else
+                   "imagery: gradient cards (no stock images found — see RENDER_LOG.md)")
         return RenderResult(
             ok=True, path=out_path,
             message=(f"Rendered {out_path} ({WIDTH}x{HEIGHT} @ {FPS}fps, ~{mins:.1f} min, "
-                     f"voice: {narr.engine}{cap}).{thumb_msg}"),
+                     f"voice: {narr.engine}{cap}; {imagery}).{thumb_msg}"),
         )
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or b"").decode("utf-8", "ignore")[-700:]
