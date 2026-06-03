@@ -359,7 +359,7 @@ _BETRAYAL_REVENGE = Brand(
     tagline="Betrayal, karma, and the quiet revenge that follows.",
     voice=("a grounded, slow-burn storytime narrator; tense and empathetic, never "
            "tabloid or cheesy; builds believable tension to a satisfying, earned payoff"),
-    tts_voice="neutral_calm",
+    tts_voice="betrayal_storyteller",
     palette=Palette(bg="#0B0B0F", bg2="#1C0E14", text="#F3EEF2",
                     accent="#E4584C", accent2="#C9A36B", subtle="#33262C"),
     font_family="Georgia, 'Times New Roman', 'Playfair Display', serif",

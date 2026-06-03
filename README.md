@@ -143,6 +143,17 @@ voices — picked automatically. The combined track needs `ffmpeg`; without it y
 still get the per-beat clips. If no engine is available, `audio/INDEX.md`
 explains how to enable it and nothing else is affected.
 
+The free voices use Microsoft's newer **Multilingual** neural models
+(`AndrewMultilingual` — warm, confident male narrator — by default for the
+betrayal/revenge brand, `AvaMultilingual` for the warm-female brands), delivered
+at a slightly slower storytelling pace so the narration sounds human and
+emotional rather than flat. Override per run without code changes:
+
+- `EDGE_TTS_VOICE` — any edge-tts voice id (run `edge-tts --list-voices`).
+- ElevenLabs expressiveness: `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`,
+  `ELEVENLABS_STABILITY` (lower = more emotional), `ELEVENLABS_STYLE`,
+  `ELEVENLABS_SIMILARITY`.
+
 ### Upload-ready MP4 (the final video)
 
 Add `--render` to a long-form command to assemble a finished **landscape

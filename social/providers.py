@@ -290,8 +290,29 @@ class OfflineTTS:
 
 
 class EdgeTTS:
-    """Free, high-quality neural voices via the `edge-tts` package (no API key)."""
+    """Free, high-quality neural voices via the `edge-tts` package (no API key).
+
+    Uses Microsoft's newer *Multilingual* neural voices (Andrew/Ava/Emma/Brian),
+    which sound markedly more natural and emotionally expressive than the older
+    Aria/Guy generation. Each voice hint also carries a storytelling rate/pitch
+    so narration breathes instead of sounding rushed and robotic.
+    """
     name = "edge-tts"
+
+    # voice_hint -> (voice, rate, pitch). Rate/pitch are edge-tts percentage/Hz
+    # offsets; slightly slower + a touch lower reads as calm and deliberate,
+    # which suits long-form storytelling.
+    _VOICES = {
+        # Grounded, slow-burn male narrator — ideal for betrayal/revenge stories.
+        "betrayal_storyteller": ("en-US-AndrewMultilingualNeural", "-8%", "-2Hz"),
+        # Warm, expressive female storyteller.
+        "story_female":         ("en-US-AvaMultilingualNeural",    "-6%", "+0Hz"),
+        # Backwards-compatible hints from the other brand presets:
+        "male_energetic":       ("en-US-AndrewMultilingualNeural", "+0%", "+0Hz"),
+        "female_warm":          ("en-US-AvaMultilingualNeural",    "-4%", "+0Hz"),
+        "neutral_calm":         ("en-US-AndrewMultilingualNeural", "-8%", "-2Hz"),
+    }
+    _DEFAULT = ("en-US-AndrewMultilingualNeural", "-6%", "+0Hz")
 
     def __init__(self) -> None:
         self.available = _module_available("edge_tts") and shutil.which("edge-tts") is not None
@@ -300,19 +321,31 @@ class EdgeTTS:
         if not self.available:
             return None
         import subprocess
-        voice = {
-            "male_energetic": "en-US-GuyNeural",
-            "female_warm": "en-US-JennyNeural",
-            "neutral_calm": "en-US-AriaNeural",
-        }.get(voice_hint, "en-US-AriaNeural")
+        # Allow overriding the voice via env without code changes.
+        env_voice = os.getenv("EDGE_TTS_VOICE", "").strip()
+        voice, rate, pitch = self._VOICES.get(voice_hint, self._DEFAULT)
+        if env_voice:
+            voice = env_voice
         try:
+            # Use --opt=value form: edge-tts' argparse misreads a leading-minus
+            # value (e.g. "-8%") as another flag when passed as a separate arg.
             subprocess.run(
-                ["edge-tts", "--voice", voice, "--text", text, "--write-media", out_path],
+                ["edge-tts", f"--voice={voice}", f"--rate={rate}", f"--pitch={pitch}",
+                 "--text", text, "--write-media", out_path],
                 check=True, capture_output=True, timeout=120,
             )
             return out_path if os.path.exists(out_path) else None
         except Exception:
-            return None
+            # Older edge-tts builds may not accept --rate/--pitch; retry plain.
+            try:
+                subprocess.run(
+                    ["edge-tts", f"--voice={voice}", "--text", text,
+                     "--write-media", out_path],
+                    check=True, capture_output=True, timeout=120,
+                )
+                return out_path if os.path.exists(out_path) else None
+            except Exception:
+                return None
 
 
 class ElevenLabsTTS:
@@ -328,10 +361,23 @@ class ElevenLabsTTS:
         if not self.available:
             return None
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
+        # Lower stability + some style = more expressive, emotional delivery
+        # (good for storytelling); speaker_boost adds presence. Tunable via env.
+        def _envf(name: str, default: float) -> float:
+            try:
+                return float(os.getenv(name, ""))
+            except ValueError:
+                return default
         body = json.dumps({
             "text": text,
-            "model_id": "eleven_multilingual_v2",
-            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+            # eleven_turbo_v2_5 is fast + natural; override via ELEVENLABS_MODEL.
+            "model_id": os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
+            "voice_settings": {
+                "stability": _envf("ELEVENLABS_STABILITY", 0.40),
+                "similarity_boost": _envf("ELEVENLABS_SIMILARITY", 0.80),
+                "style": _envf("ELEVENLABS_STYLE", 0.45),
+                "use_speaker_boost": True,
+            },
         }).encode("utf-8")
         req = urllib.request.Request(
             url, data=body,

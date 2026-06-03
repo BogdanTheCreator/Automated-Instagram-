@@ -96,20 +96,25 @@ def _download(url: str, out_path: str, timeout: int = 60) -> Optional[str]:
         return None
 
 
-def _lower_third(text: str, palette) -> str:
-    """A drawtext + drawbox filter chain for a clean lower-third caption.
+def _lower_third(text: str, palette, draw_label: bool = True) -> str:
+    """A drawbox lower-third band, optionally with a section-label caption.
+
+    The band serves as a readable backdrop for the burned-in narration
+    subtitles. When `draw_label` is False (the default render path, where the
+    spoken narration is burned in as captions), we draw ONLY the band — drawing
+    the label too would stack a second line of text on top of the captions
+    (the "double captions" problem). When True (captions disabled), the label
+    becomes the single on-screen text.
 
     Uses literal pixel coordinates (some ffmpeg builds reject `h*0.78`-style
-    expressions inside drawbox). If this build lacks `drawtext`, return just the
-    decorative band so the clip still renders; the spoken text is still conveyed
-    by the burned-in subtitles (libass), which is the priority.
+    expressions inside drawbox).
     """
     band_y = int(HEIGHT * 0.78)          # 842 on 1080
     band_h = HEIGHT - band_y             # 238
     accent = _hex_to_ffmpeg(palette.accent)
     band = (f"drawbox=x=0:y={band_y}:w={WIDTH}:h={band_h}:color=0x000000@0.55:t=fill,"
             f"drawbox=x=0:y={band_y}:w={WIDTH}:h=5:color={accent}:t=fill")
-    if not _has_drawtext():
+    if not draw_label or not _has_drawtext():
         return band + ",format=yuv420p"
     txt = _escape_drawtext(_wrap(text, 42))
     textcol = _hex_to_ffmpeg(palette.text)
@@ -144,14 +149,14 @@ def _beat_background(query: str, idx: int, tmp: str) -> Optional[str]:
 
 
 def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
-                brand: Brand, tmp: str) -> str:
+                brand: Brand, tmp: str, draw_label: bool = False) -> str:
     """Render one beat to an intermediate landscape mp4 and return its path."""
     p = brand.palette
     out = os.path.join(tmp, f"beat_{idx:03d}.mp4")
     duration = max(1.0, round(duration, 2))
     frames = int(duration * FPS)
     bg = _beat_background(query, idx, tmp)
-    lower = _lower_third(on_screen, p)
+    lower = _lower_third(on_screen, p, draw_label=draw_label)
 
     if bg and bg.endswith(".mp4"):
         # Use the stock video as the base: scale/crop to 16:9, loop/trim to dur.
@@ -406,11 +411,16 @@ def render_long_video(
     tmp = tempfile.mkdtemp(prefix="vplong_")
     try:
         clips, srt_rows = [], []
+        # If we're burning narration captions, don't also draw the per-beat
+        # section label (that would stack two text layers = "double captions").
+        # When captions are off, the label becomes the single on-screen text.
+        draw_label = not burn_captions
         for i, (scene, audio_part) in enumerate(pairs):
             dur = _probe_duration(audio_part) or max(2.0, scene.duration)
             label = scene.on_screen or scene.role.title()
             query = getattr(scene, "broll_query", "") or kit.topic
-            clips.append(_scene_clip(i, label, dur, query, brand, tmp))
+            clips.append(_scene_clip(i, label, dur, query, brand, tmp,
+                                     draw_label=draw_label))
             srt_rows.append((scene.narration, dur))
 
         video = _concat(clips, tmp)
