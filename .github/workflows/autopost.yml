@@ -1,0 +1,157 @@
+# Auto-post to Instagram — runs on GitHub's servers, nothing installed on your PC.
+#
+# WHAT IT DOES (once per run):
+#   1. Picks today's topic, writes the script/captions/hashtags, renders a Reel
+#      MP4 and a branded cover image.
+#   2. Uploads the video + cover to public GitHub Release URLs.
+#   3. Publishes the Reel to your Instagram via the official Graph API.
+#   4. (Optional) Refreshes the long-lived token so it never expires.
+#
+# SECRETS (GitHub -> Settings -> Secrets and variables -> Actions):
+#   Required to post for real:
+#     IG_USER_ID        your Instagram Business account id
+#     IG_ACCESS_TOKEN   a long-lived token with instagram_content_publish
+#   Optional:
+#     OPENAI_API_KEY    AI-written scripts + AI cover art
+#     IG_APP_ID         } together with GH_PAT, auto-refreshes the token daily
+#     IG_APP_SECRET     }   so you never have to touch it again
+#     GH_PAT            a Personal Access Token with "secrets: write" on this repo
+#   Variable (optional): BRAND = ai_income | privacy | money | longevity
+#
+# SAFETY: with no IG secrets every run is a harmless DRY RUN (renders, no post).
+# Manual runs default to dry-run — flip the toggle off to post. Scheduled runs
+# post for real once the secrets exist.
+#
+# NOTE: your repository must be PUBLIC so Instagram can fetch the media URLs.
+
+name: Auto-post to Instagram
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: "Niche (ai_income, privacy, money, longevity)"
+        default: "ai_income"
+      dry_run:
+        description: "Dry run (render only, do NOT post)"
+        type: boolean
+        default: true
+  schedule:
+    # 13:00 UTC every day. Edit the time, or add lines, to change the cadence.
+    - cron: "0 13 * * *"
+
+permissions:
+  contents: write # upload rendered media as Release assets
+
+concurrency:
+  group: autopost
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install video + voiceover tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install -q edge-tts
+
+      - name: Generate and render today's Reel + cover
+        id: gen
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          BRAND="${{ github.event.inputs.brand }}"
+          [ -z "$BRAND" ] && BRAND="${{ vars.BRAND }}"
+          [ -z "$BRAND" ] && BRAND="ai_income"
+          echo "Using brand: $BRAND"
+          python -m social.cli --autopost --brand "$BRAND" --out autopost_out
+
+      - name: Upload media to public Release URLs
+        id: upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VIDEO="${{ steps.gen.outputs.video }}"
+          COVER="${{ steps.gen.outputs.cover }}"
+          if [ -z "$VIDEO" ] || [ ! -f "$VIDEO" ]; then
+            echo "No rendered video found; nothing to upload."
+            echo "video_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh release create autopost-media \
+            --title "Auto-post media" \
+            --notes "Rendered media uploaded by the autopost workflow." 2>/dev/null || true
+          STAMP="$(date +%Y%m%d-%H%M%S)"
+          VASSET="reel-$STAMP.mp4"
+          cp "$VIDEO" "$VASSET"
+          gh release upload autopost-media "$VASSET" --clobber
+          BASE="https://github.com/${{ github.repository }}/releases/download/autopost-media"
+          echo "video_url=$BASE/$VASSET" >> "$GITHUB_OUTPUT"
+          echo "Public video URL: $BASE/$VASSET"
+          if [ -n "$COVER" ] && [ -f "$COVER" ]; then
+            CASSET="cover-$STAMP.jpg"
+            cp "$COVER" "$CASSET"
+            gh release upload autopost-media "$CASSET" --clobber
+            echo "cover_url=$BASE/$CASSET" >> "$GITHUB_OUTPUT"
+            echo "Public cover URL: $BASE/$CASSET"
+          fi
+
+      - name: Post to Instagram
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: |
+          URL="${{ steps.upload.outputs.video_url }}"
+          COVER_URL="${{ steps.upload.outputs.cover_url }}"
+          CAPTION_FILE="${{ steps.gen.outputs.caption_file }}"
+          DRY="${{ github.event.inputs.dry_run }}"
+          if [ -z "$URL" ]; then
+            echo "No video URL (render likely failed); skipping post."
+            exit 0
+          fi
+          COVER_ARG=""
+          [ -n "$COVER_URL" ] && COVER_ARG="--cover-url $COVER_URL"
+          if [ "$DRY" = "true" ] || [ -z "$IG_USER_ID" ] || [ -z "$IG_ACCESS_TOKEN" ]; then
+            echo "Running in DRY RUN mode (no post will be made)."
+            python -m social.cli --publish --video-url "$URL" $COVER_ARG --caption-file "$CAPTION_FILE" --dry-run
+          else
+            python -m social.cli --publish --video-url "$URL" $COVER_ARG --caption-file "$CAPTION_FILE"
+          fi
+
+      - name: Refresh & store the long-lived token (optional)
+        env:
+          IG_APP_ID: ${{ secrets.IG_APP_ID }}
+          IG_APP_SECRET: ${{ secrets.IG_APP_SECRET }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$IG_APP_ID" ] || [ -z "$IG_APP_SECRET" ] || [ -z "$GH_TOKEN" ]; then
+            echo "Token auto-refresh not configured (needs IG_APP_ID, IG_APP_SECRET, GH_PAT). Skipping."
+            exit 0
+          fi
+          NEW="$(python -m social.cli --refresh-token 2>/dev/null || true)"
+          if [ -n "$NEW" ]; then
+            echo "::add-mask::$NEW"
+            printf '%s' "$NEW" | gh secret set IG_ACCESS_TOKEN
+            echo "Refreshed IG_ACCESS_TOKEN (reset to ~60 more days)."
+          else
+            echo "Could not refresh token (it may already be expired); refresh it manually."
+          fi
+
+      - name: Save the kit as a downloadable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: todays-content-kit
+          path: autopost_out/**
+          if-no-files-found: ignore

@@ -1,0 +1,13 @@
+# Generated content kits (keep curated examples under samples/ instead)
+content_kits/
+*.mp4
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
