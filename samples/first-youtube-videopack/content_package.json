@@ -1,0 +1,311 @@
+{
+  "topic": "my husband's affair with my best friend",
+  "brand_key": "betrayal_revenge",
+  "brand_name": "Betrayal & Revenge Stories",
+  "title": "My Husband's Affair with My Best Friend",
+  "hook": "The day I learned the truth about my husband's affair with my best friend, everything changed.",
+  "hook_variants": [
+    "The day I learned the truth about my husband's affair with my best friend, everything changed.",
+    "They betrayed the wrong person. This is the story of my husband's affair with my best friend.",
+    "They thought I'd never find out about my husband's affair with my best friend. They were wrong."
+  ],
+  "cta": "Follow for the stories people are too afraid to tell.",
+  "scenes": [
+    {
+      "index": 0,
+      "role": "hook",
+      "on_screen": "The day I learned the truth about…",
+      "narration": "The day I learned the truth about my husband's affair with my best friend, everything changed.",
+      "broll_query": "cinematic cold-open establishing shot",
+      "start": 0.0,
+      "end": 10.0
+    },
+    {
+      "index": 1,
+      "role": "setup",
+      "on_screen": "Before it all went wrong",
+      "narration": "Let me take you back to before any of this happened. Life was ordinary then, and honestly, I liked it that way. I had no idea what was coming.",
+      "broll_query": "quiet everyday life, soft morning light",
+      "start": 10.0,
+      "end": 53.77
+    },
+    {
+      "index": 2,
+      "role": "trust",
+      "on_screen": "I trusted them",
+      "narration": "I trusted them completely. That's the part that still matters, because you don't get betrayed by strangers. You get betrayed by the people you let all the way in.",
+      "broll_query": "two people laughing, warm candid memories",
+      "start": 53.77,
+      "end": 97.54
+    },
+    {
+      "index": 3,
+      "role": "first_crack",
+      "on_screen": "The first small sign",
+      "narration": "The first sign was small. So small I talked myself out of it. A look that lasted a second too long, an answer that didn't quite fit. I let it go.",
+      "broll_query": "phone face-down on a table, subtle tension",
+      "start": 97.54,
+      "end": 144.32
+    },
+    {
+      "index": 4,
+      "role": "suspicion",
+      "on_screen": "It stopped adding up",
+      "narration": "But small things add up. Soon I was noticing the gaps. The times that didn't line up. The stories that changed depending on the day. So I started paying attention.",
+      "broll_query": "clock, calendar, a door closing",
+      "start": 144.32,
+      "end": 189.59
+    },
+    {
+      "index": 5,
+      "role": "betrayal",
+      "on_screen": "Then I found out",
+      "narration": "Then it all came out. My husband's affair with my best friend. I'm not going to pretend I was calm. The floor just moved, and everything I thought I understood rearranged itself in a single moment.",
+      "broll_query": "rain on a dark window, dim room",
+      "start": 189.59,
+      "end": 243.92
+    },
+    {
+      "index": 6,
+      "role": "fallout",
+      "on_screen": "The quiet after",
+      "narration": "For a few days I barely functioned. Part of me wanted to scream. A bigger part of me went very, very quiet. And looking back, that quiet was the most dangerous thing in the room.",
+      "broll_query": "empty room, single lamp, long shadows",
+      "start": 243.92,
+      "end": 296.74
+    },
+    {
+      "index": 7,
+      "role": "decision",
+      "on_screen": "I made a decision",
+      "narration": "That's when I decided something. I wasn't going to beg, and I wasn't going to explode. I was going to wait, and I was going to be precise.",
+      "broll_query": "close-up of steady, determined eyes",
+      "start": 296.74,
+      "end": 339.0
+    },
+    {
+      "index": 8,
+      "role": "plan",
+      "on_screen": "I started preparing",
+      "narration": "So I started preparing. Nothing dramatic. Just the truth, organized. Dates. Messages. Receipts. Everything they thought was hidden, quietly gathered in one place.",
+      "broll_query": "documents, folder, screenshots on a screen",
+      "start": 339.0,
+      "end": 373.71
+    },
+    {
+      "index": 9,
+      "role": "escalation",
+      "on_screen": "They had no idea",
+      "narration": "And they had no idea. They kept performing, kept smiling, kept assuming I was still the person who missed the first sign. I let them keep thinking that. It made what came next so much cleaner.",
+      "broll_query": "dinner table, forced smiles, glances",
+      "start": 373.71,
+      "end": 428.04
+    },
+    {
+      "index": 10,
+      "role": "turning_point",
+      "on_screen": "The tables turned",
+      "narration": "Then came the moment I'd been building toward. One room. The right people. And the truth laid out plainly, where no one could twist it or talk over it.",
+      "broll_query": "meeting room, papers laid on a table",
+      "start": 428.04,
+      "end": 471.81
+    },
+    {
+      "index": 11,
+      "role": "payoff",
+      "on_screen": "It was already too late",
+      "narration": "I never had to raise my voice. The truth did all the damage.",
+      "broll_query": "a stunned, silent realization",
+      "start": 471.81,
+      "end": 491.43
+    },
+    {
+      "index": 12,
+      "role": "aftermath",
+      "on_screen": "What was left",
+      "narration": "There were no fireworks. Just consequences, arriving right on schedule. They lost the thing they had risked everything to protect, and I got my life back without ever lowering myself to their level.",
+      "broll_query": "an open door, walking into daylight",
+      "start": 491.43,
+      "end": 541.23
+    },
+    {
+      "index": 13,
+      "role": "reflection",
+      "on_screen": "What it taught me",
+      "narration": "Here's what I learned. The loudest reaction is almost never the strongest one. Sometimes the calmest person in the room is simply the one who already knows how the story ends.",
+      "broll_query": "calm sunrise, a steady horizon",
+      "start": 541.23,
+      "end": 588.01
+    },
+    {
+      "index": 14,
+      "role": "cta",
+      "on_screen": "Follow for the stories people are…",
+      "narration": "Follow for the stories people are too afraid to tell.",
+      "broll_query": "channel outro / subscribe prompt",
+      "start": 588.01,
+      "end": 600.01
+    }
+  ],
+  "srt": "1\n00:00:00,000 --> 00:00:03,333\nThe day I learned the truth\n\n2\n00:00:03,333 --> 00:00:06,667\nabout my husband's affair with my\n\n3\n00:00:06,667 --> 00:00:10,000\nbest friend, everything changed.\n\n4\n00:00:10,000 --> 00:00:18,754\nLet me take you back to\n\n5\n00:00:18,754 --> 00:00:27,508\nbefore any of this happened. Life\n\n6\n00:00:27,508 --> 00:00:36,262\nwas ordinary then, and honestly, I\n\n7\n00:00:36,262 --> 00:00:45,016\nliked it that way. I had\n\n8\n00:00:45,016 --> 00:00:53,770\nno idea what was coming.\n\n9\n00:00:53,770 --> 00:01:02,524\nI trusted them completely. That's the\n\n10\n00:01:02,524 --> 00:01:11,278\npart that still matters, because you\n\n11\n00:01:11,278 --> 00:01:20,032\ndon't get betrayed by strangers. You\n\n12\n00:01:20,032 --> 00:01:28,786\nget betrayed by the people you\n\n13\n00:01:28,786 --> 00:01:37,540\nlet all the way in.\n\n14\n00:01:37,540 --> 00:01:45,337\nThe first sign was small. So\n\n15\n00:01:45,337 --> 00:01:53,133\nsmall I talked myself out of\n\n16\n00:01:53,133 --> 00:02:00,930\nit. A look that lasted a\n\n17\n00:02:00,930 --> 00:02:08,727\nsecond too long, an answer that\n\n18\n00:02:08,727 --> 00:02:16,523\ndidn't quite fit. I let it\n\n19\n00:02:16,523 --> 00:02:24,320\ngo.\n\n20\n00:02:24,320 --> 00:02:33,374\nBut small things add up. Soon\n\n21\n00:02:33,374 --> 00:02:42,428\nI was noticing the gaps. The\n\n22\n00:02:42,428 --> 00:02:51,482\ntimes that didn't line up. The\n\n23\n00:02:51,482 --> 00:03:00,536\nstories that changed depending on the\n\n24\n00:03:00,536 --> 00:03:09,590\nday. So I started paying attention.\n\n25\n00:03:09,590 --> 00:03:18,645\nThen it all came out. My\n\n26\n00:03:18,645 --> 00:03:27,700\nhusband's affair with my best friend.\n\n27\n00:03:27,700 --> 00:03:36,755\nI'm not going to pretend I\n\n28\n00:03:36,755 --> 00:03:45,810\nwas calm. The floor just moved,\n\n29\n00:03:45,810 --> 00:03:54,865\nand everything I thought I understood\n\n30\n00:03:54,865 --> 00:04:03,920\nrearranged itself in a single moment.\n\n31\n00:04:03,920 --> 00:04:12,723\nFor a few days I barely\n\n32\n00:04:12,723 --> 00:04:21,527\nfunctioned. Part of me wanted to\n\n33\n00:04:21,527 --> 00:04:30,330\nscream. A bigger part of me\n\n34\n00:04:30,330 --> 00:04:39,133\nwent very, very quiet. And looking\n\n35\n00:04:39,133 --> 00:04:47,937\nback, that quiet was the most\n\n36\n00:04:47,937 --> 00:04:56,740\ndangerous thing in the room.\n\n37\n00:04:56,740 --> 00:05:05,192\nThat's when I decided something. I\n\n38\n00:05:05,192 --> 00:05:13,644\nwasn't going to beg, and I\n\n39\n00:05:13,644 --> 00:05:22,096\nwasn't going to explode. I was\n\n40\n00:05:22,096 --> 00:05:30,548\ngoing to wait, and I was\n\n41\n00:05:30,548 --> 00:05:39,000\ngoing to be precise.\n\n42\n00:05:39,000 --> 00:05:47,678\nSo I started preparing. Nothing dramatic.\n\n43\n00:05:47,678 --> 00:05:56,355\nJust the truth, organized. Dates. Messages.\n\n44\n00:05:56,355 --> 00:06:05,033\nReceipts. Everything they thought was hidden,\n\n45\n00:06:05,033 --> 00:06:13,710\nquietly gathered in one place.\n\n46\n00:06:13,710 --> 00:06:22,765\nAnd they had no idea. They\n\n47\n00:06:22,765 --> 00:06:31,820\nkept performing, kept smiling, kept assuming\n\n48\n00:06:31,820 --> 00:06:40,875\nI was still the person who\n\n49\n00:06:40,875 --> 00:06:49,930\nmissed the first sign. I let\n\n50\n00:06:49,930 --> 00:06:58,985\nthem keep thinking that. It made\n\n51\n00:06:58,985 --> 00:07:08,040\nwhat came next so much cleaner.\n\n52\n00:07:08,040 --> 00:07:16,794\nThen came the moment I'd been\n\n53\n00:07:16,794 --> 00:07:25,548\nbuilding toward. One room. The right\n\n54\n00:07:25,548 --> 00:07:34,302\npeople. And the truth laid out\n\n55\n00:07:34,302 --> 00:07:43,056\nplainly, where no one could twist\n\n56\n00:07:43,056 --> 00:07:51,810\nit or talk over it.\n\n57\n00:07:51,810 --> 00:07:58,350\nI never had to raise my\n\n58\n00:07:58,350 --> 00:08:04,890\nvoice. The truth did all the\n\n59\n00:08:04,890 --> 00:08:11,430\ndamage.\n\n60\n00:08:11,430 --> 00:08:19,730\nThere were no fireworks. Just consequences,\n\n61\n00:08:19,730 --> 00:08:28,030\narriving right on schedule. They lost\n\n62\n00:08:28,030 --> 00:08:36,330\nthe thing they had risked everything\n\n63\n00:08:36,330 --> 00:08:44,630\nto protect, and I got my\n\n64\n00:08:44,630 --> 00:08:52,930\nlife back without ever lowering myself\n\n65\n00:08:52,930 --> 00:09:01,230\nto their level.\n\n66\n00:09:01,230 --> 00:09:09,027\nHere's what I learned. The loudest\n\n67\n00:09:09,027 --> 00:09:16,823\nreaction is almost never the strongest\n\n68\n00:09:16,823 --> 00:09:24,620\none. Sometimes the calmest person in\n\n69\n00:09:24,620 --> 00:09:32,417\nthe room is simply the one\n\n70\n00:09:32,417 --> 00:09:40,213\nwho already knows how the story\n\n71\n00:09:40,213 --> 00:09:48,010\nends.\n\n72\n00:09:48,010 --> 00:09:54,010\nFollow for the stories people are\n\n73\n00:09:54,010 --> 00:10:00,010\ntoo afraid to tell.\n",
+  "caption": "The best revenge is letting the truth arrive right on schedule.\n\nIn this story: My Husband's Affair with My Best Friend. A slow-burn, true-to-life account of betrayal and the quiet justice that followed — no spoilers here, you'll want to watch it unfold.\n\nIf you enjoy grounded betrayal and revenge stories, subscribe — there's a new one every week.\n\nChapters are below. Story is dramatized for storytelling; names and details are changed.\n\n#husbandsaffairbest #storytime #revenge",
+  "alt_text": "Faceless narrated story video about my husband's affair with my best friend. ~10 minutes, 15 narrative beats.",
+  "hashtags": {
+    "tags": [
+      "husbands affair best",
+      "storytime",
+      "revenge",
+      "betrayal",
+      "drama",
+      "truestory",
+      "redditstories",
+      "cheatingstories",
+      "revengestory",
+      "familydrama",
+      "karma",
+      "storytimevideo",
+      "relationshipdrama",
+      "reddit",
+      "quietrevenge"
+    ]
+  },
+  "recommended_hashtags": [
+    "husbands affair best",
+    "storytime",
+    "revenge",
+    "betrayal",
+    "drama",
+    "truestory",
+    "redditstories",
+    "cheatingstories",
+    "revengestory",
+    "familydrama",
+    "karma",
+    "storytimevideo",
+    "relationshipdrama",
+    "reddit",
+    "quietrevenge"
+  ],
+  "voiceover_text": "The day I learned the truth about my husband's affair with my best friend, everything changed.\n\nLet me take you back to before any of this happened. Life was ordinary then, and honestly, I liked it that way. I had no idea what was coming.\n\nI trusted them completely. That's the part that still matters, because you don't get betrayed by strangers. You get betrayed by the people you let all the way in.\n\nThe first sign was small. So small I talked myself out of it. A look that lasted a second too long, an answer that didn't quite fit. I let it go.\n\nBut small things add up. Soon I was noticing the gaps. The times that didn't line up. The stories that changed depending on the day. So I started paying attention.\n\nThen it all came out. My husband's affair with my best friend. I'm not going to pretend I was calm. The floor just moved, and everything I thought I understood rearranged itself in a single moment.\n\nFor a few days I barely functioned. Part of me wanted to scream. A bigger part of me went very, very quiet. And looking back, that quiet was the most dangerous thing in the room.\n\nThat's when I decided something. I wasn't going to beg, and I wasn't going to explode. I was going to wait, and I was going to be precise.\n\nSo I started preparing. Nothing dramatic. Just the truth, organized. Dates. Messages. Receipts. Everything they thought was hidden, quietly gathered in one place.\n\nAnd they had no idea. They kept performing, kept smiling, kept assuming I was still the person who missed the first sign. I let them keep thinking that. It made what came next so much cleaner.\n\nThen came the moment I'd been building toward. One room. The right people. And the truth laid out plainly, where no one could twist it or talk over it.\n\nI never had to raise my voice. The truth did all the damage.\n\nThere were no fireworks. Just consequences, arriving right on schedule. They lost the thing they had risked everything to protect, and I got my life back without ever lowering myself to their level.\n\nHere's what I learned. The loudest reaction is almost never the strongest one. Sometimes the calmest person in the room is simply the one who already knows how the story ends.\n\nFollow for the stories people are too afraid to tell.",
+  "voiceover_ssml": "<speak>\n  <prosody rate=\"fast\" pitch=\"+2st\">The day I learned the truth about my husband's affair with my best friend, everything changed.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">Let me take you back to before any of this happened. Life was ordinary then, and honestly, I liked it that way. I had no idea what was coming.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">I trusted them completely. That's the part that still matters, because you don't get betrayed by strangers. You get betrayed by the people you let all the way in.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">The first sign was small. So small I talked myself out of it. A look that lasted a second too long, an answer that didn't quite fit. I let it go.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">But small things add up. Soon I was noticing the gaps. The times that didn't line up. The stories that changed depending on the day. So I started paying attention.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">Then it all came out. My husband's affair with my best friend. I'm not going to pretend I was calm. The floor just moved, and everything I thought I understood rearranged itself in a single moment.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">For a few days I barely functioned. Part of me wanted to scream. A bigger part of me went very, very quiet. And looking back, that quiet was the most dangerous thing in the room.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">That's when I decided something. I wasn't going to beg, and I wasn't going to explode. I was going to wait, and I was going to be precise.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">So I started preparing. Nothing dramatic. Just the truth, organized. Dates. Messages. Receipts. Everything they thought was hidden, quietly gathered in one place.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">And they had no idea. They kept performing, kept smiling, kept assuming I was still the person who missed the first sign. I let them keep thinking that. It made what came next so much cleaner.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">Then came the moment I'd been building toward. One room. The right people. And the truth laid out plainly, where no one could twist it or talk over it.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">I never had to raise my voice. The truth did all the damage.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">There were no fireworks. Just consequences, arriving right on schedule. They lost the thing they had risked everything to protect, and I got my life back without ever lowering myself to their level.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\">Here's what I learned. The loudest reaction is almost never the strongest one. Sometimes the calmest person in the room is simply the one who already knows how the story ends.</prosody><break time=\"350ms\"/>\n  <prosody rate=\"medium\" pitch=\"+1st\">Follow for the stories people are too afraid to tell.</prosody><break time=\"350ms\"/>\n</speak>",
+  "thumbnail_text": [
+    "My Husband's Affair with My Best Friend",
+    "They Never Thought I'd Find Out",
+    "I Stayed Quiet. Then Everything Changed."
+  ],
+  "series_name": "The Betrayal Files",
+  "best_post_times_utc": [
+    "18:00",
+    "22:00",
+    "00:00"
+  ],
+  "total_seconds": 600.01,
+  "generator": "framework:offline",
+  "created_utc": "2026-06-03T11:49:59+00:00",
+  "format": "long",
+  "titles": [
+    "My Husband's Affair with My Best Friend",
+    "They Never Thought I'd Find Out",
+    "I Stayed Quiet. Then Everything Changed.",
+    "The Truth About My Husband's Affair with My Best Friend",
+    "How It All Came Back Around",
+    "My Husband's Affair with My Best Friend — I Waited for the Right Moment"
+  ],
+  "youtube": {
+    "best_title": "My Husband's Affair with My Best Friend",
+    "title_variations": [
+      "My Husband's Affair with My Best Friend",
+      "They Never Thought I'd Find Out",
+      "I Stayed Quiet. Then Everything Changed.",
+      "The Truth About My Husband's Affair with My Best Friend",
+      "How It All Came Back Around",
+      "My Husband's Affair with My Best Friend — I Waited for the Right Moment"
+    ],
+    "description": "The best revenge is letting the truth arrive right on schedule.\n\nIn this story: My Husband's Affair with My Best Friend. A slow-burn, true-to-life account of betrayal and the quiet justice that followed — no spoilers here, you'll want to watch it unfold.\n\nIf you enjoy grounded betrayal and revenge stories, subscribe — there's a new one every week.\n\nChapters are below. Story is dramatized for storytelling; names and details are changed.\n\n#husbandsaffairbest #storytime #revenge",
+    "tags": [
+      "husbands affair best",
+      "storytime",
+      "revenge",
+      "betrayal",
+      "drama",
+      "truestory",
+      "redditstories",
+      "cheatingstories",
+      "revengestory",
+      "familydrama",
+      "karma",
+      "storytimevideo",
+      "relationshipdrama",
+      "reddit",
+      "quietrevenge"
+    ],
+    "best_keyword": "husbands affair best friend story",
+    "pinned_comment": "Would you have stayed quiet and waited, or said something the moment you found out? Tell me below — and no spoilers for anyone still watching. 👇",
+    "chapters": [
+      {
+        "time": "0:00",
+        "label": "The hook"
+      },
+      {
+        "time": "0:10",
+        "label": "How it started"
+      },
+      {
+        "time": "3:10",
+        "label": "The betrayal"
+      },
+      {
+        "time": "4:57",
+        "label": "The decision"
+      },
+      {
+        "time": "5:39",
+        "label": "The plan"
+      },
+      {
+        "time": "7:08",
+        "label": "The tables turn"
+      },
+      {
+        "time": "7:52",
+        "label": "The payoff"
+      },
+      {
+        "time": "8:11",
+        "label": "The aftermath"
+      },
+      {
+        "time": "9:01",
+        "label": "What it taught me"
+      },
+      {
+        "time": "9:48",
+        "label": "Before you go"
+      }
+    ]
+  },
+  "thumbnail_concepts": [
+    "Split frame: a warm family photo torn down the middle. Overlay 2 words like \"SHE LIED\" in bold condensed type, red accent. High contrast for mobile.",
+    "A hand hiding a phone behind a back, screen glowing. Overlay \"THE TEXT\". Dark, cinematic, single light source.",
+    "An empty chair at a dinner table with one place setting removed. Overlay \"NOT INVITED\". Moody, lots of negative space so it reads at thumbnail size."
+  ],
+  "shorts_ideas": [
+    "Cold-open teaser (15-30s): open on “The day I learned the truth about my husband's affair with my best friend, everything changed.” then cut to black with “Full story on the channel.”",
+    "The reveal (20-40s): build for 10 seconds, then drop the moment the betrayal is discovered. End on a question to drive comments.",
+    "The payoff (20-40s): tease the setup in one line, then show the satisfying turn. Caption: “Would you have done the same?”"
+  ],
+  "community_posts": [
+    "Poll: When you sense a betrayal coming, do you (A) confront it immediately or (B) stay quiet and watch? This week's story is about someone who chose B.",
+    "Teaser: New story dropping — “My Husband's Affair with My Best Friend.” One small mistake gave the whole thing away. Any guesses what it was? 👀"
+  ],
+  "environment": {
+    "ffmpeg": false,
+    "openai_key": false,
+    "openai_base_url": "https://api.openai.com/v1",
+    "elevenlabs_key": false,
+    "edge_tts": false,
+    "pyttsx3": false,
+    "pexels_key": false,
+    "pixabay_key": false
+  }
+}

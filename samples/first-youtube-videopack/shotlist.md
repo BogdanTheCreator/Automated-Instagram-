@@ -1,0 +1,17 @@
+# Shot list / b-roll direction
+
+- **0.0s** [hook] search: `cinematic cold-open establishing shot` — overlay: "The day I learned the truth about…"
+- **10.0s** [setup] search: `quiet everyday life, soft morning light` — overlay: "Before it all went wrong"
+- **53.8s** [trust] search: `two people laughing, warm candid memories` — overlay: "I trusted them"
+- **97.5s** [first_crack] search: `phone face-down on a table, subtle tension` — overlay: "The first small sign"
+- **144.3s** [suspicion] search: `clock, calendar, a door closing` — overlay: "It stopped adding up"
+- **189.6s** [betrayal] search: `rain on a dark window, dim room` — overlay: "Then I found out"
+- **243.9s** [fallout] search: `empty room, single lamp, long shadows` — overlay: "The quiet after"
+- **296.7s** [decision] search: `close-up of steady, determined eyes` — overlay: "I made a decision"
+- **339.0s** [plan] search: `documents, folder, screenshots on a screen` — overlay: "I started preparing"
+- **373.7s** [escalation] search: `dinner table, forced smiles, glances` — overlay: "They had no idea"
+- **428.0s** [turning_point] search: `meeting room, papers laid on a table` — overlay: "The tables turned"
+- **471.8s** [payoff] search: `a stunned, silent realization` — overlay: "It was already too late"
+- **491.4s** [aftermath] search: `an open door, walking into daylight` — overlay: "What was left"
+- **541.2s** [reflection] search: `calm sunrise, a steady horizon` — overlay: "What it taught me"
+- **588.0s** [cta] search: `channel outro / subscribe prompt` — overlay: "Follow for the stories people are…"
