@@ -70,6 +70,10 @@ class ScriptBrief:
     scene_count: int
     seconds: int
     point_count: int
+    # "tips" = short value video; "story" = long-form narrated story.
+    kind: str = "tips"
+    # Approximate total narration word count target (used for long-form).
+    target_words: int = 0
 
 
 class LLMProvider(Protocol):
@@ -114,6 +118,8 @@ class OpenAICompatibleLLM:
     def write_script(self, brief: ScriptBrief) -> Optional[Dict[str, object]]:
         if not self.key:
             return None
+        if getattr(brief, "kind", "tips") == "story":
+            return self._write_story(brief)
         sys_prompt = (
             "You are a viral short-form scriptwriter for faceless Reels. "
             "Return STRICT JSON only, no prose."
@@ -129,6 +135,39 @@ class OpenAICompatibleLLM:
             "\"payoff\": str, \"cta\": str}. "
             "Punchy, specific, no fluff, no emojis inside narration."
         )
+        return self._chat_json(sys_prompt, user_prompt, want_keys=("points", "hook"))
+
+    def _write_story(self, brief: ScriptBrief) -> Optional[Dict[str, object]]:
+        """Long-form narrated storytelling script (8-12 min YouTube videos)."""
+        words = brief.target_words or int(brief.seconds * 2.6)
+        sys_prompt = (
+            "You are an expert faceless YouTube storytelling scriptwriter. You write "
+            "long-form first-person narration for betrayal/revenge story channels. "
+            "Dramatic but believable, never tabloid, never cheesy. Return STRICT JSON only."
+        )
+        user_prompt = (
+            f"Channel: {brief.brand_name}\nVoice: {brief.voice}\n"
+            f"Story premise: {brief.topic}\n"
+            f"Write a complete narration script of about {words} words "
+            f"(target runtime ~{brief.seconds // 60} minutes), structured as ordered beats.\n"
+            "Requirements: a gripping hook in the first 2 sentences; clear setup; "
+            "rising tension; a believable betrayal; a controlled, satisfying payoff "
+            "(justice/karma, not cartoonish); a short reflective lesson; then a CTA. "
+            "First-person narration text only inside each beat (no scene directions, "
+            "no stage notes, no emojis).\n"
+            "JSON shape: {\"title\": str, \"hook\": str (1-2 sentences, scroll-stopping), "
+            "\"beats\": [{\"section\": str (short label e.g. 'Setup','The Betrayal','Payoff'), "
+            "\"on_screen\": str (<=6 words for an overlay), "
+            "\"narration\": str (2-5 sentences of spoken narration), "
+            "\"broll\": str (2-5 word stock-footage / b-roll search)}], "
+            "\"cta\": str}. "
+            f"Provide 10-14 beats so the total reaches roughly {words} words."
+        )
+        return self._chat_json(sys_prompt, user_prompt, want_keys=("beats", "hook"),
+                               max_tokens=4000)
+
+    def _chat_json(self, sys_prompt: str, user_prompt: str,
+                   want_keys: tuple, max_tokens: int = 1200) -> Optional[Dict[str, object]]:
         body = json.dumps({
             "model": self.model,
             "messages": [
@@ -136,6 +175,7 @@ class OpenAICompatibleLLM:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.8,
+            "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }).encode("utf-8")
         req = urllib.request.Request(
@@ -148,11 +188,11 @@ class OpenAICompatibleLLM:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with urllib.request.urlopen(req, timeout=90) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             content = payload["choices"][0]["message"]["content"]
             data = json.loads(content)
-            if "points" in data and "hook" in data:
+            if all(k in data for k in want_keys):
                 return data
             return None
         except (urllib.error.URLError, KeyError, ValueError, TimeoutError):
