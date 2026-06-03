@@ -29,6 +29,13 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Protocol
 
 
+# A descriptive User-Agent is REQUIRED for some image APIs (notably Pexels,
+# which sits behind Cloudflare and returns 403 "error code: 1010" to requests
+# with the default Python-urllib signature). Send it on every outbound HTTP
+# request to an image/stock service.
+_HTTP_UA = "faceless-video-bot/1.0 (+https://github.com; educational use)"
+
+
 # --------------------------------------------------------------------------- #
 # Capability probing
 # --------------------------------------------------------------------------- #
@@ -450,7 +457,8 @@ class PexelsStock:
         url = (f"https://api.pexels.com/videos/search?per_page=1"
                f"&orientation={orientation}"
                f"&query={urllib.request.quote(query)}")
-        req = urllib.request.Request(url, headers={"Authorization": self.key})
+        req = urllib.request.Request(url, headers={"Authorization": self.key,
+                                                   "User-Agent": _HTTP_UA})
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
@@ -508,7 +516,8 @@ class PexelsPhotos:
         url = (f"https://api.pexels.com/v1/search?per_page={per_page}"
                f"&orientation={orientation}"
                f"&query={urllib.request.quote(query)}")
-        req = urllib.request.Request(url, headers={"Authorization": self.key})
+        req = urllib.request.Request(url, headers={"Authorization": self.key,
+                                                   "User-Agent": _HTTP_UA})
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
@@ -525,7 +534,7 @@ class PexelsPhotos:
             return []
 
 
-_PHOTO_UA = "faceless-video-bot/1.0 (https://github.com/; educational use)"
+_PHOTO_UA = _HTTP_UA
 
 
 class OpenversePhotos:
