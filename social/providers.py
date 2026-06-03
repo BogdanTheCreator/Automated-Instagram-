@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import urllib.error
 import urllib.request
@@ -140,6 +141,9 @@ class OpenAICompatibleLLM:
     def _write_story(self, brief: ScriptBrief) -> Optional[Dict[str, object]]:
         """Long-form narrated storytelling script (8-12 min YouTube videos)."""
         words = brief.target_words or int(brief.seconds * 2.6)
+        # Give the model enough room: ~1.4 tokens/word for the narration plus
+        # JSON structure overhead, with a sane floor and ceiling.
+        budget = max(4000, min(8000, int(words * 1.6) + 1200))
         sys_prompt = (
             "You are an expert faceless YouTube storytelling scriptwriter. You write "
             "long-form first-person narration for betrayal/revenge story channels. "
@@ -164,7 +168,33 @@ class OpenAICompatibleLLM:
             f"Provide 10-14 beats so the total reaches roughly {words} words."
         )
         return self._chat_json(sys_prompt, user_prompt, want_keys=("beats", "hook"),
-                               max_tokens=4000)
+                               max_tokens=budget)
+
+    @staticmethod
+    def _loads_lenient(content: str) -> Optional[Dict[str, object]]:
+        """Parse JSON from a model response that may wrap it in markdown fences
+        or surround it with prose (common with Ollama/LM Studio/Groq)."""
+        if not content:
+            return None
+        try:
+            return json.loads(content)
+        except ValueError:
+            pass
+        # Strip ```json ... ``` fences.
+        fence = re.search(r"```(?:json)?\s*(.+?)```", content, re.DOTALL)
+        if fence:
+            try:
+                return json.loads(fence.group(1))
+            except ValueError:
+                pass
+        # Last resort: grab the outermost {...} object.
+        start, end = content.find("{"), content.rfind("}")
+        if 0 <= start < end:
+            try:
+                return json.loads(content[start:end + 1])
+            except ValueError:
+                return None
+        return None
 
     def _chat_json(self, sys_prompt: str, user_prompt: str,
                    want_keys: tuple, max_tokens: int = 1200) -> Optional[Dict[str, object]]:
@@ -188,11 +218,11 @@ class OpenAICompatibleLLM:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             content = payload["choices"][0]["message"]["content"]
-            data = json.loads(content)
-            if all(k in data for k in want_keys):
+            data = self._loads_lenient(content)
+            if data and all(k in data for k in want_keys):
                 return data
             return None
         except (urllib.error.URLError, KeyError, ValueError, TimeoutError):

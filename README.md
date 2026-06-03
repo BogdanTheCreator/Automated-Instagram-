@@ -123,15 +123,35 @@ Without an `OPENAI_API_KEY`, the script is a complete, brand-aware **beat sheet*
 writes the full ~1,500-word narration**. Everything else (titles, SEO,
 thumbnails, promotion) is generated either way.
 
+### Automatic voiceover (free, no API key)
+
+Add `--voiceover` to a long-form command and the narration is synthesized to MP3
+right inside the pack — no separate tool, no recording:
+
+```bash
+python3 -m social.cli "my husband's affair with my best friend" \
+    --brand betrayal_revenge --voiceover
+```
+
+This writes an `audio/` folder containing **one MP3 per story beat**
+(`00_hook.mp3`, `01_setup.mp3`, …) so you can drop each clip onto its matching
+b-roll, plus a single combined **`narration.mp3`** for the whole video, and an
+`INDEX.md` mapping each beat to its file. It uses
+[`edge-tts`](https://pypi.org/project/edge-tts/) (free neural voices, just
+`pip install edge-tts`) or, if `ELEVENLABS_API_KEY` is set, premium ElevenLabs
+voices — picked automatically. The combined track needs `ffmpeg`; without it you
+still get the per-beat clips. If no engine is available, `audio/INDEX.md`
+explains how to enable it and nothing else is affected.
+
 ### Weekly Video Pack on autopilot (free, on GitHub's servers)
 
 [`.github/workflows/weekly-videopack.yml`](.github/workflows/weekly-videopack.yml)
 runs **every Monday at 08:00 UTC** (and on-demand from the **Actions** tab). It
-writes the opportunity report + a full Video Pack for the week's top topic and
-uploads it as a **downloadable artifact**. It renders no video and publishes
-nothing, so it needs no keys and almost no CI minutes — you keep human control of
-the final script, thumbnail, render and upload. Add `OPENAI_API_KEY` as a repo
-secret to upgrade the writing.
+writes the opportunity report + a full Video Pack for the week's top topic,
+**synthesizes the narration to MP3** (free edge-tts is installed in the run), and
+uploads everything as a **downloadable artifact**. It publishes nothing, so you
+keep human control of the final thumbnail, video assembly and upload. Add
+`OPENAI_API_KEY` as a repo secret to upgrade the script to full written narration.
 
 ## Auto-posting to Instagram (hands-off, no PC install)
 
@@ -198,6 +218,7 @@ social/
   engine.py       prompt -> ContentKit; writes all kit files (short + long-form)
   calendar.py     N-day content calendar (topics x formats); batch kit generation
   videopack.py    long-form YouTube Video Pack + weekly opportunity report
+  narration.py    long-form voiceover: per-beat MP3s + combined narration.mp3
   storyboard.py   animated, dependency-free HTML Reel preview
   render.py       ffmpeg MP4 assembly + voiceover mixing
   publisher.py    Instagram Graph API publishing (Reels + image), stdlib only

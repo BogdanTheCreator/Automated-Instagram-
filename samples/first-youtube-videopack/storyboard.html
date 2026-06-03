@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>My Husband's Affair with My Best Friend — Reel preview</title>
+<style>
+  :root {
+    --bg: #0B0B0F; --bg2: #1C0E14; --text: #F3EEF2;
+    --accent: #E4584C; --accent2: #C9A36B; --subtle: #33262C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #05070d;
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', 'Playfair Display', serif;
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+    padding: 28px 12px 48px; min-height: 100%;
+  }
+  .meta { text-align: center; opacity: .85; max-width: 420px; }
+  .meta h1 { font-size: 17px; font-weight: 700; }
+  .meta p { font-size: 12px; opacity: .7; margin-top: 4px; }
+  .phone {
+    position: relative; width: 320px; height: 569px; /* 9:16 */
+    border-radius: 38px; padding: 10px; background: #0c0e14;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 0 0 2px #1c2030;
+  }
+  .notch {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 22px; background: #000; border-radius: 14px; z-index: 9;
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%; border-radius: 30px;
+    overflow: hidden; background: var(--bg);
+  }
+  .bg {
+    position: absolute; inset: 0; opacity: 0; transition: opacity .5s ease;
+    transform: scale(1.05);
+  }
+  .bg.active { opacity: 1; animation: kenburns var(--dur,4s) linear forwards; }
+  @keyframes kenburns { from { transform: scale(1.02) } to { transform: scale(1.14) } }
+  .grain {
+    position:absolute; inset:0; pointer-events:none; opacity:.06;
+    background-image: radial-gradient(#fff 1px, transparent 1px);
+    background-size: 3px 3px; mix-blend-mode: overlay;
+  }
+  .topbar {
+    position: absolute; top: 46px; left: 16px; right: 16px; z-index: 6;
+    display: flex; align-items: center; gap: 8px; font-size: 12px; opacity:.9;
+  }
+  .dot { width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .caption-wrap {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; padding: 26px; text-align: center; z-index: 5;
+  }
+  .caption {
+    font-weight: 800; line-height: 1.12; letter-spacing: -.01em;
+    font-size: 34px; text-shadow: 0 2px 18px rgba(0,0,0,.55);
+  }
+  .caption .w { opacity: .28; transition: opacity .12s ease, color .12s ease; }
+  .caption .w.on { opacity: 1; }
+  .caption .w.hot { color: var(--accent); }
+  .rolebadge {
+    position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+    z-index: 6; font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.18); opacity: .9;
+  }
+  .subs {
+    position: absolute; left: 18px; right: 18px; bottom: 92px; z-index: 6;
+    text-align: center; font-size: 15px; font-weight: 600; opacity: .92;
+    text-shadow: 0 1px 8px rgba(0,0,0,.6);
+  }
+  .cta-chip {
+    position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+    z-index: 7; padding: 10px 16px; border-radius: 999px; font-weight: 700;
+    font-size: 14px; color: #05070d;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    box-shadow: 0 8px 30px rgba(0,0,0,.4); display: none;
+  }
+  .progress {
+    position: absolute; left: 14px; right: 14px; bottom: 20px; z-index: 8;
+    height: 4px; display: flex; gap: 4px;
+  }
+  .seg { flex: 1; background: rgba(255,255,255,.22); border-radius: 4px; overflow: hidden; }
+  .seg > i { display:block; height:100%; width:0%; background: var(--text); }
+  .handle {
+    position:absolute; bottom: 56px; left: 18px; z-index: 6; font-size: 13px;
+    font-weight: 700; opacity:.95; text-shadow: 0 1px 8px rgba(0,0,0,.6);
+  }
+  .controls { display:flex; gap:10px; align-items:center; }
+  button {
+    background: #11131c; color: var(--text); border: 1px solid #262a3a;
+    border-radius: 10px; padding: 9px 14px; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); }
+  .hint { font-size: 11px; opacity: .5; }
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>My Husband's Affair with My Best Friend</h1>
+    <p>Betrayal &amp; Revenge Stories · ~600s · animated preview (no audio)</p>
+  </div>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen" id="screen">
+      <div class="bg" id="bg"></div>
+      <div class="grain"></div>
+      <div class="topbar"><span class="dot"></span><span>@quiet.revenge.stories</span></div>
+      <div class="rolebadge" id="role">HOOK</div>
+      <div class="caption-wrap"><div class="caption" id="caption"></div></div>
+      <div class="cta-chip" id="cta">FOLLOW</div>
+      <div class="subs" id="subs"></div>
+      <div class="handle">@quiet.revenge.stories</div>
+      <div class="progress" id="progress"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="play">⏸ Pause</button>
+    <button id="restart">⟲ Restart</button>
+    <span class="hint">Loops automatically · captions sync to scene timing</span>
+  </div>
+
+<script>
+const DATA = {"title": "My Husband's Affair with My Best Friend", "handle": "@quiet.revenge.stories", "brandName": "Betrayal & Revenge Stories", "totalSeconds": 600.01, "scenes": [{"role": "hook", "onScreen": "The day I learned the truth about…", "narration": "The day I learned the truth about my husband's affair with my best friend, everything changed.", "broll": "cinematic cold-open establishing shot", "start": 0.0, "end": 10.0}, {"role": "setup", "onScreen": "Before it all went wrong", "narration": "Let me take you back to before any of this happened. Life was ordinary then, and honestly, I liked it that way. I had no idea what was coming.", "broll": "quiet everyday life, soft morning light", "start": 10.0, "end": 53.77}, {"role": "trust", "onScreen": "I trusted them", "narration": "I trusted them completely. That's the part that still matters, because you don't get betrayed by strangers. You get betrayed by the people you let all the way in.", "broll": "two people laughing, warm candid memories", "start": 53.77, "end": 97.54}, {"role": "first_crack", "onScreen": "The first small sign", "narration": "The first sign was small. So small I talked myself out of it. A look that lasted a second too long, an answer that didn't quite fit. I let it go.", "broll": "phone face-down on a table, subtle tension", "start": 97.54, "end": 144.32}, {"role": "suspicion", "onScreen": "It stopped adding up", "narration": "But small things add up. Soon I was noticing the gaps. The times that didn't line up. The stories that changed depending on the day. So I started paying attention.", "broll": "clock, calendar, a door closing", "start": 144.32, "end": 189.59}, {"role": "betrayal", "onScreen": "Then I found out", "narration": "Then it all came out. My husband's affair with my best friend. I'm not going to pretend I was calm. The floor just moved, and everything I thought I understood rearranged itself in a single moment.", "broll": "rain on a dark window, dim room", "start": 189.59, "end": 243.92}, {"role": "fallout", "onScreen": "The quiet after", "narration": "For a few days I barely functioned. Part of me wanted to scream. A bigger part of me went very, very quiet. And looking back, that quiet was the most dangerous thing in the room.", "broll": "empty room, single lamp, long shadows", "start": 243.92, "end": 296.74}, {"role": "decision", "onScreen": "I made a decision", "narration": "That's when I decided something. I wasn't going to beg, and I wasn't going to explode. I was going to wait, and I was going to be precise.", "broll": "close-up of steady, determined eyes", "start": 296.74, "end": 339.0}, {"role": "plan", "onScreen": "I started preparing", "narration": "So I started preparing. Nothing dramatic. Just the truth, organized. Dates. Messages. Receipts. Everything they thought was hidden, quietly gathered in one place.", "broll": "documents, folder, screenshots on a screen", "start": 339.0, "end": 373.71}, {"role": "escalation", "onScreen": "They had no idea", "narration": "And they had no idea. They kept performing, kept smiling, kept assuming I was still the person who missed the first sign. I let them keep thinking that. It made what came next so much cleaner.", "broll": "dinner table, forced smiles, glances", "start": 373.71, "end": 428.04}, {"role": "turning_point", "onScreen": "The tables turned", "narration": "Then came the moment I'd been building toward. One room. The right people. And the truth laid out plainly, where no one could twist it or talk over it.", "broll": "meeting room, papers laid on a table", "start": 428.04, "end": 471.81}, {"role": "payoff", "onScreen": "It was already too late", "narration": "I never had to raise my voice. The truth did all the damage.", "broll": "a stunned, silent realization", "start": 471.81, "end": 491.43}, {"role": "aftermath", "onScreen": "What was left", "narration": "There were no fireworks. Just consequences, arriving right on schedule. They lost the thing they had risked everything to protect, and I got my life back without ever lowering myself to their level.", "broll": "an open door, walking into daylight", "start": 491.43, "end": 541.23}, {"role": "reflection", "onScreen": "What it taught me", "narration": "Here's what I learned. The loudest reaction is almost never the strongest one. Sometimes the calmest person in the room is simply the one who already knows how the story ends.", "broll": "calm sunrise, a steady horizon", "start": 541.23, "end": 588.01}, {"role": "cta", "onScreen": "Follow for the stories people are…", "narration": "Follow for the stories people are too afraid to tell.", "broll": "channel outro / subscribe prompt", "start": 588.01, "end": 600.01}], "palette": {"bg": "#0B0B0F", "bg2": "#1C0E14", "text": "#F3EEF2", "accent": "#E4584C", "accent2": "#C9A36B", "subtle": "#33262C"}, "font": "Georgia, 'Times New Roman', 'Playfair Display', serif"};
+const scenes = DATA.scenes;
+const total = DATA.totalSeconds;
+const pal = DATA.palette;
+
+const bg = document.getElementById('bg');
+const captionEl = document.getElementById('caption');
+const subsEl = document.getElementById('subs');
+const roleEl = document.getElementById('role');
+const ctaEl = document.getElementById('cta');
+const progress = document.getElementById('progress');
+
+// Build progress segments (one per scene, weighted by duration).
+scenes.forEach(s => {
+  const seg = document.createElement('div');
+  seg.className = 'seg';
+  seg.style.flex = Math.max(0.2, (s.end - s.start));
+  seg.innerHTML = '<i></i>';
+  progress.appendChild(seg);
+});
+const segFills = [...progress.querySelectorAll('i')];
+
+const gradients = [
+  `linear-gradient(160deg, ${pal.bg}, ${pal.bg2})`,
+  `radial-gradient(120% 80% at 30% 20%, ${pal.bg2}, ${pal.bg})`,
+  `linear-gradient(200deg, ${pal.bg2}, ${pal.bg} 70%)`,
+];
+
+function splitWords(text) {
+  return text.split(/\s+/).filter(Boolean);
+}
+
+let current = -1;
+function showScene(i) {
+  const s = scenes[i];
+  current = i;
+  bg.style.setProperty('--dur', (s.end - s.start) + 's');
+  bg.style.background = gradients[i % gradients.length];
+  bg.classList.remove('active'); void bg.offsetWidth; bg.classList.add('active');
+
+  roleEl.textContent = s.role;
+  ctaEl.style.display = (s.role === 'cta') ? 'block' : 'none';
+
+  // Big on-screen caption as karaoke words.
+  captionEl.innerHTML = '';
+  const words = splitWords(s.onScreen);
+  // scale font down a touch for long lines
+  captionEl.style.fontSize = words.length > 5 ? '28px' : '34px';
+  words.forEach(w => {
+    const span = document.createElement('span');
+    span.className = 'w'; span.textContent = w + ' ';
+    captionEl.appendChild(span);
+  });
+}
+
+function render(t) {
+  // find active scene
+  let i = scenes.findIndex(s => t >= s.start && t < s.end);
+  if (i === -1) i = scenes.length - 1;
+  if (i !== current) showScene(i);
+
+  const s = scenes[i];
+  const frac = Math.min(1, Math.max(0, (t - s.start) / Math.max(0.001, (s.end - s.start))));
+
+  // karaoke highlight on the big caption
+  const ws = captionEl.querySelectorAll('.w');
+  const hot = Math.floor(frac * ws.length);
+  ws.forEach((el, k) => {
+    el.classList.toggle('on', k <= hot);
+    el.classList.toggle('hot', k === hot);
+  });
+
+  // bottom subtitle: reveal narration progressively
+  const nwords = splitWords(s.narration);
+  const shown = Math.max(1, Math.ceil(frac * nwords.length));
+  subsEl.textContent = nwords.slice(0, shown).join(' ');
+
+  // progress bars
+  segFills.forEach((f, k) => {
+    f.style.width = (k < i ? 100 : (k === i ? frac * 100 : 0)) + '%';
+  });
+}
+
+let playing = true;
+let t0 = performance.now();
+let clock = 0;
+
+function loop(now) {
+  if (playing) {
+    const dt = (now - t0) / 1000;
+    t0 = now;
+    clock += dt;
+    if (clock >= total) clock = 0; // loop
+    render(clock);
+  } else {
+    t0 = now;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.getElementById('play').onclick = (e) => {
+  playing = !playing;
+  e.target.textContent = playing ? '⏸ Pause' : '▶ Play';
+};
+document.getElementById('restart').onclick = () => { clock = 0; };
+</script>
+</body>
+</html>

@@ -132,6 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--music", default=None, help="Path to background music for --render.")
     p.add_argument("--no-voiceover", action="store_true",
                    help="Skip TTS voiceover when rendering.")
+    p.add_argument("--voiceover", action="store_true",
+                   help="For long-form packs: synthesize the narration to MP3 "
+                        "(per-beat clips + a combined narration.mp3) using edge-tts "
+                        "(free) or ELEVENLABS_API_KEY. Writes into the pack's audio/ folder.")
     p.add_argument("--doctor", action="store_true", help="Report premium feature availability.")
     p.add_argument("--list-brands", action="store_true", help="List niche presets and exit.")
     p.add_argument("--ideas", action="store_true", help="Print topic ideas for the brand and exit.")
@@ -187,6 +191,19 @@ def _resolve_seconds(args) -> int:
     return args.duration  # 0 -> auto in engine
 
 
+def _maybe_voiceover(args, kit, folder) -> None:
+    """If --voiceover was requested, synthesize narration audio into the pack
+    folder and print a clear status line. Never raises."""
+    if not getattr(args, "voiceover", False):
+        return
+    from .narration import synthesize_narration
+    res = synthesize_narration(kit, folder)
+    print(f"\n  Voiceover: {res.message}")
+    if res.ok and res.combined:
+        print(f"    Combined : {res.combined}")
+        print(f"    Clips    : {len(res.parts)} in {os.path.join(folder, 'audio')}/")
+
+
 def _run_videopack(args) -> int:
     topic = args.topic
     if not topic:
@@ -207,6 +224,7 @@ def _run_videopack(args) -> int:
     print(f"  Brand    : {kit.brand_name} ({kit.brand_key})")
     print(f"  Length   : ~{kit.total_seconds / 60:.0f} min across {len(kit.scenes)} beats")
     print(f"  Script by: {kit.generator}")
+    _maybe_voiceover(args, kit, folder)
     print("\n  Open VIDEO_PACK.md for the full, ready-to-produce package.")
     return 0
 
@@ -215,7 +233,8 @@ def _run_weekly(args) -> int:
     from .videopack import write_weekly
     out = args.out if args.out != "content_kits" else "weekly_out"
     try:
-        folder = write_weekly(args.brand, out_root=out, seconds=_resolve_seconds(args))
+        folder = write_weekly(args.brand, out_root=out, seconds=_resolve_seconds(args),
+                              voiceover=getattr(args, "voiceover", False))
     except (KeyError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -436,6 +455,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                      "promotion.md", "captions.srt", "voiceover.txt", "voiceover.ssml",
                      "shotlist.md", "storyboard.html", "content_package.json"):
             print(f"    - {os.path.join(folder, name)}")
+        _maybe_voiceover(args, kit, folder)
         print("\n  Tip: open VIDEO_PACK.md for the full package; storyboard.html previews pacing.")
         return 0
 
