@@ -25,6 +25,7 @@ message and never raises — the text pack and audio are still produced upstream
 """
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import subprocess
@@ -35,7 +36,7 @@ from typing import List, Optional
 from .brand import Brand, get_brand
 from .engine import ContentKit
 from .narration import synthesize_narration
-from .providers import auto_image, auto_stock, has_ffmpeg
+from .providers import auto_image, auto_photos, auto_stock, has_ffmpeg
 # Reuse the battle-tested helpers from the short-form renderer.
 from .render import (
     RenderResult,
@@ -126,73 +127,138 @@ def _lower_third(text: str, palette, draw_label: bool = True) -> str:
     )
 
 
-def _beat_background(query: str, idx: int, tmp: str) -> Optional[str]:
-    """Best-effort still image for a beat: stock photo / AI art, else None."""
-    # 1) Try a stock provider (Pexels). It returns video URLs; we also accept
-    #    a photo via the image provider below. Pexels video is heavier, so we
-    #    prefer an AI/stock still for a stable Ken-Burns base.
+def _beat_images(query: str, idx: int, tmp: str, want: int) -> List[str]:
+    """Fetch up to `want` relevant still images for a beat, in priority order:
+
+      1. Free Pexels photos (several distinct images -> a slideshow per beat).
+      2. A single AI-generated image (OPENAI_API_KEY).
+      3. A frame grabbed from a Pexels stock video.
+
+    Returns a list of local image file paths (possibly empty -> caller uses the
+    on-brand gradient card). All best-effort; never raises.
+    """
+    want = max(1, want)
+    paths: List[str] = []
+
+    # 1) Pexels photos — the main path for "show what's being talked about".
+    photos = auto_photos()
+    if getattr(photos, "name", "") == "pexels-photos":
+        urls = photos.search(query, count=want, orientation="landscape")
+        for j, url in enumerate(urls):
+            dst = os.path.join(tmp, f"img_{idx:03d}_{j:02d}.jpg")
+            if _download(url, dst):
+                paths.append(dst)
+        if paths:
+            return paths
+
+    # 2) AI background art (single image).
     img = auto_image()
     if getattr(img, "name", "") != "offline-gradient":
-        out = os.path.join(tmp, f"bg_{idx:03d}.png")
-        made = img.background(query, out)
+        dst = os.path.join(tmp, f"img_{idx:03d}_ai.png")
+        made = img.background(query, dst)
         if made:
-            return made
-    # 2) Stock video frame (Pexels) — download and let ffmpeg grab a still.
+            return [made]
+
+    # 3) Stock video frame as a still.
     stock = auto_stock()
     if getattr(stock, "name", "") == "pexels":
-        clip = stock.find(query)
+        clip = stock.find(query, orientation="landscape") if _accepts_orientation(stock) else stock.find(query)
         if clip and clip.url:
             vid = os.path.join(tmp, f"stock_{idx:03d}.mp4")
             if _download(clip.url, vid):
-                return vid  # a video; _scene_clip handles both
-    return None
+                frame = os.path.join(tmp, f"frame_{idx:03d}.jpg")
+                try:
+                    subprocess.run(["ffmpeg", "-y", "-i", vid, "-frames:v", "1", frame],
+                                   check=True, capture_output=True, timeout=60)
+                    if os.path.exists(frame):
+                        return [frame]
+                except Exception:
+                    pass
+    return paths
+
+
+def _accepts_orientation(stock) -> bool:
+    """PexelsStock.find now takes an orientation kwarg; guard for older shims."""
+    try:
+        import inspect
+        return "orientation" in inspect.signature(stock.find).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _kenburns_clip(image: str, duration: float, idx: int, sub: int,
+                   lower: str, tmp: str) -> str:
+    """Render a single image into a `duration`s Ken-Burns landscape clip."""
+    out = os.path.join(tmp, f"kb_{idx:03d}_{sub:02d}.mp4")
+    frames = max(1, int(round(duration * FPS)))
+    # Alternate zoom-in / gentle pan direction for variety across images.
+    if sub % 2 == 0:
+        zexpr = "min(zoom+0.0009,1.15)"
+    else:
+        zexpr = "if(lte(zoom,1.0),1.15,max(1.0,zoom-0.0009))"
+    vf = (
+        f"scale={WIDTH * 2}:-1,"
+        f"zoompan=z='{zexpr}':d={frames}:"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={WIDTH}x{HEIGHT}:fps={FPS},"
+        f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color=0x000000@0.35:t=fill,"
+        + lower
+    )
+    cmd = ["ffmpeg", "-y", "-loop", "1", "-i", image, "-t", f"{duration:.2f}",
+           "-vf", vf, "-r", f"{FPS}", "-c:v", "libx264", "-pix_fmt", "yuv420p", out]
+    subprocess.run(cmd, check=True, capture_output=True)
+    return out
 
 
 def _scene_clip(idx: int, on_screen: str, duration: float, query: str,
                 brand: Brand, tmp: str, draw_label: bool = False) -> str:
-    """Render one beat to an intermediate landscape mp4 and return its path."""
+    """Render one beat to an intermediate landscape mp4 and return its path.
+
+    If relevant images are available, the beat becomes a short slideshow of
+    those images (one Ken-Burns sub-clip each), so viewers see pictures of what
+    is being narrated. Otherwise it falls back to an on-brand gradient card.
+    """
     p = brand.palette
     out = os.path.join(tmp, f"beat_{idx:03d}.mp4")
     duration = max(1.0, round(duration, 2))
-    frames = int(duration * FPS)
-    bg = _beat_background(query, idx, tmp)
     lower = _lower_third(on_screen, p, draw_label=draw_label)
 
-    if bg and bg.endswith(".mp4"):
-        # Use the stock video as the base: scale/crop to 16:9, loop/trim to dur.
-        vf = (
-            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
-            f"crop={WIDTH}:{HEIGHT},"
-            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color=0x000000@0.30:t=fill,"
-            + lower
-        )
-        cmd = ["ffmpeg", "-y", "-stream_loop", "-1", "-i", bg, "-t", f"{duration}",
-               "-vf", vf, "-r", f"{FPS}", "-an",
-               "-c:v", "libx264", "-pix_fmt", "yuv420p", out]
-    elif bg:
-        # Still image with a slow Ken-Burns zoom.
-        vf = (
-            f"scale={WIDTH * 2}:-1,"
-            f"zoompan=z='min(zoom+0.0008,1.12)':d={frames}:"
-            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={WIDTH}x{HEIGHT}:fps={FPS},"
-            f"drawbox=x=0:y=0:w={WIDTH}:h={HEIGHT}:color=0x000000@0.35:t=fill,"
-            + lower
-        )
-        cmd = ["ffmpeg", "-y", "-loop", "1", "-i", bg, "-t", f"{duration}",
-               "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p", out]
-    else:
-        # On-brand gradient card — no external assets needed. Use the `gradients`
-        # SOURCE filter (works reliably across builds; zoompan on a synthetic
-        # source errors on some ffmpeg versions, so we keep it static).
-        base = _hex_to_ffmpeg(p.bg)
-        base2 = _hex_to_ffmpeg(p.bg2 if idx % 2 == 0 else p.accent2 if hasattr(p, "accent2") else p.bg2)
-        src = (f"gradients=s={WIDTH}x{HEIGHT}:c0={base}:c1={base2}:"
-               f"x0=0:y0=0:x1={WIDTH}:y1={HEIGHT}:d={duration}:r={FPS}")
-        vf = lower  # lower already ends with format=yuv420p
-        cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", src,
-               "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p",
-               "-t", f"{duration}", out]
+    # Aim for one fresh image roughly every ~5s of narration (min 1, cap 4).
+    want = max(1, min(4, int(math.ceil(duration / 5.0))))
+    images = _beat_images(query, idx, tmp, want)
 
+    if images:
+        # Split the beat duration evenly across the available images and build a
+        # Ken-Burns clip for each, then concatenate them into the beat clip.
+        n = len(images)
+        per = max(1.5, round(duration / n, 2))
+        subclips = [
+            _kenburns_clip(img, per, idx, j, lower, tmp)
+            for j, img in enumerate(images)
+        ]
+        if len(subclips) == 1:
+            shutil.move(subclips[0], out)
+        else:
+            beat_list = os.path.join(tmp, f"beat_{idx:03d}.txt")
+            with open(beat_list, "w", encoding="utf-8") as fh:
+                for c in subclips:
+                    fh.write(f"file '{os.path.abspath(c)}'\n")
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", beat_list,
+                 "-c", "copy", out],
+                check=True, capture_output=True,
+            )
+        return out
+
+    # Fallback: on-brand gradient card (no external assets). Use the `gradients`
+    # SOURCE filter (zoompan on a synthetic source errors on some ffmpeg builds).
+    base = _hex_to_ffmpeg(p.bg)
+    base2 = _hex_to_ffmpeg(p.bg2 if idx % 2 == 0 else
+                           p.accent2 if hasattr(p, "accent2") else p.bg2)
+    src = (f"gradients=s={WIDTH}x{HEIGHT}:c0={base}:c1={base2}:"
+           f"x0=0:y0=0:x1={WIDTH}:y1={HEIGHT}:d={duration}:r={FPS}")
+    cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", src,
+           "-vf", lower, "-c:v", "libx264", "-pix_fmt", "yuv420p",
+           "-t", f"{duration}", out]
     subprocess.run(cmd, check=True, capture_output=True)
     return out
 

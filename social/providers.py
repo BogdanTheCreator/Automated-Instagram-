@@ -434,16 +434,22 @@ class OfflineStock:
 
 
 class PexelsStock:
-    """Free stock video via Pexels. Set PEXELS_API_KEY."""
+    """Free stock video via Pexels. Set PEXELS_API_KEY.
+
+    `orientation` defaults to "landscape" (16:9 YouTube). Short-form Reels can
+    pass "portrait".
+    """
     name = "pexels"
 
     def __init__(self) -> None:
         self.key = os.getenv("PEXELS_API_KEY", "")
 
-    def find(self, query: str) -> StockClip:
+    def find(self, query: str, orientation: str = "landscape") -> StockClip:
         if not self.key:
             return OfflineStock().find(query)
-        url = f"https://api.pexels.com/videos/search?per_page=1&orientation=portrait&query={urllib.request.quote(query)}"
+        url = (f"https://api.pexels.com/videos/search?per_page=1"
+               f"&orientation={orientation}"
+               f"&query={urllib.request.quote(query)}")
         req = urllib.request.Request(url, headers={"Authorization": self.key})
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -463,6 +469,66 @@ def auto_stock() -> StockProvider:
     if os.getenv("PEXELS_API_KEY"):
         return PexelsStock()
     return OfflineStock()
+
+
+# --------------------------------------------------------------------------- #
+# Stock PHOTO provider (free) — used to show relevant imagery per story beat
+# --------------------------------------------------------------------------- #
+
+class PhotoProvider(Protocol):
+    name: str
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        """Return up to `count` direct image URLs for the query (may be empty)."""
+        ...
+
+
+class OfflinePhotos:
+    name = "offline-none"
+
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        return []
+
+
+class PexelsPhotos:
+    """Free stock photos via Pexels (https://www.pexels.com/api/). Set
+    PEXELS_API_KEY. Returns several large landscape image URLs per query so the
+    renderer can show a sequence of relevant pictures across a story beat."""
+    name = "pexels-photos"
+
+    def __init__(self) -> None:
+        self.key = os.getenv("PEXELS_API_KEY", "")
+
+    def search(self, query: str, count: int = 3,
+               orientation: str = "landscape") -> List[str]:
+        if not self.key:
+            return []
+        per_page = max(1, min(15, count))
+        url = (f"https://api.pexels.com/v1/search?per_page={per_page}"
+               f"&orientation={orientation}"
+               f"&query={urllib.request.quote(query)}")
+        req = urllib.request.Request(url, headers={"Authorization": self.key})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            photos = data.get("photos") or []
+            urls: List[str] = []
+            for ph in photos[:count]:
+                src = ph.get("src") or {}
+                # Prefer a large, landscape-friendly rendition.
+                link = src.get("landscape") or src.get("large2x") or src.get("large") or src.get("original")
+                if link:
+                    urls.append(link)
+            return urls
+        except Exception:
+            return []
+
+
+def auto_photos() -> PhotoProvider:
+    if os.getenv("PEXELS_API_KEY"):
+        return PexelsPhotos()
+    return OfflinePhotos()
 
 
 
