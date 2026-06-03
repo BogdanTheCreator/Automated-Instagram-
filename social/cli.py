@@ -128,7 +128,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", "-o", default="content_kits",
                    help="Output root folder (default ./content_kits).")
     p.add_argument("--render", action="store_true",
-                   help="Also render an MP4 (requires ffmpeg).")
+                   help="Also render an MP4 (requires ffmpeg). Short-form -> vertical "
+                        "Reel; long-form Video Pack -> landscape narrated YouTube video.")
+    p.add_argument("--burn-captions", action="store_true",
+                   help="For long-form --render: hard-burn captions into the video "
+                        "(default off; YouTube can auto-caption from the audio).")
     p.add_argument("--music", default=None, help="Path to background music for --render.")
     p.add_argument("--no-voiceover", action="store_true",
                    help="Skip TTS voiceover when rendering.")
@@ -204,6 +208,23 @@ def _maybe_voiceover(args, kit, folder) -> None:
         print(f"    Clips    : {len(res.parts)} in {os.path.join(folder, 'audio')}/")
 
 
+def _maybe_render_long(args, kit, folder) -> None:
+    """If --render was requested for a long-form pack, assemble the MP4 (visuals
+    + voiceover + optional burned captions) into the pack folder. Never raises."""
+    if not getattr(args, "render", False):
+        return
+    from .render_long import render_long_video
+    mp4 = os.path.join(folder, "video.mp4")
+    result = render_long_video(
+        kit, mp4, folder=folder, music_path=args.music,
+        burn_captions=getattr(args, "burn_captions", False),
+    )
+    print("\n  Render:", result.message)
+    if result.ok:
+        print(f"    Upload-ready video: {result.path}")
+        print("    Pair it with a thumbnail from thumbnails.md and the metadata in seo.md.")
+
+
 def _run_videopack(args) -> int:
     topic = args.topic
     if not topic:
@@ -225,6 +246,7 @@ def _run_videopack(args) -> int:
     print(f"  Length   : ~{kit.total_seconds / 60:.0f} min across {len(kit.scenes)} beats")
     print(f"  Script by: {kit.generator}")
     _maybe_voiceover(args, kit, folder)
+    _maybe_render_long(args, kit, folder)
     print("\n  Open VIDEO_PACK.md for the full, ready-to-produce package.")
     return 0
 
@@ -234,7 +256,9 @@ def _run_weekly(args) -> int:
     out = args.out if args.out != "content_kits" else "weekly_out"
     try:
         folder = write_weekly(args.brand, out_root=out, seconds=_resolve_seconds(args),
-                              voiceover=getattr(args, "voiceover", False))
+                              voiceover=getattr(args, "voiceover", False),
+                              render=getattr(args, "render", False),
+                              burn_captions=getattr(args, "burn_captions", False))
     except (KeyError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -456,6 +480,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                      "shotlist.md", "storyboard.html", "content_package.json"):
             print(f"    - {os.path.join(folder, name)}")
         _maybe_voiceover(args, kit, folder)
+        _maybe_render_long(args, kit, folder)
         print("\n  Tip: open VIDEO_PACK.md for the full package; storyboard.html previews pacing.")
         return 0
 

@@ -143,15 +143,48 @@ voices — picked automatically. The combined track needs `ffmpeg`; without it y
 still get the per-beat clips. If no engine is available, `audio/INDEX.md`
 explains how to enable it and nothing else is affected.
 
+### Upload-ready MP4 (the final video)
+
+Add `--render` to a long-form command to assemble a finished **landscape
+1920x1080 narrated video** — the visuals are timed to the actual voiceover, with
+a lower-third caption per beat and a slow Ken-Burns motion:
+
+```bash
+python3 -m social.cli "my husband's affair with my best friend" \
+    --brand betrayal_revenge --render            # voiceover is generated automatically
+```
+
+This writes **`video.mp4`** into the pack folder, ready to upload (pair it with a
+thumbnail from `thumbnails.md` and the metadata in `seo.md`). Backgrounds use:
+
+- real **stock footage/photos** if `PEXELS_API_KEY` is set,
+- **AI background art** if `OPENAI_API_KEY` is set, otherwise
+- clean **on-brand gradient cards** (no keys, always works).
+
+Requires `ffmpeg` on PATH (`brew install ffmpeg` / `apt-get install -y ffmpeg` /
+`winget install Gyan.FFmpeg`). Without it, the full pack + voiceover text are
+still produced and you get a clear message. Captions are left off the frame by
+default (YouTube auto-captions from the audio); add `--burn-captions` to hard-burn
+them. The complete flow from a topic to an uploadable file is:
+
+```bash
+# topic -> script + SEO + thumbnails + voiceover + video.mp4
+python3 -m social.cli "a sibling who stole an inheritance" \
+    --brand betrayal_revenge --render
+```
+
 ### Weekly Video Pack on autopilot (free, on GitHub's servers)
 
 [`.github/workflows/weekly-videopack.yml`](.github/workflows/weekly-videopack.yml)
 runs **every Monday at 08:00 UTC** (and on-demand from the **Actions** tab). It
 writes the opportunity report + a full Video Pack for the week's top topic,
-**synthesizes the narration to MP3** (free edge-tts is installed in the run), and
-uploads everything as a **downloadable artifact**. It publishes nothing, so you
-keep human control of the final thumbnail, video assembly and upload. Add
-`OPENAI_API_KEY` as a repo secret to upgrade the script to full written narration.
+**synthesizes the narration to MP3** and **assembles the upload-ready
+`video.mp4`** (free edge-tts + ffmpeg are installed in the run), then uploads
+everything as a **downloadable artifact**. It publishes nothing, so you keep
+human control of the final thumbnail and upload. Set `OPENAI_API_KEY` for full
+written narration and `PEXELS_API_KEY` for real stock-footage backgrounds. The
+MP4 render is the heaviest step — untick the **render** input on a manual run for
+a fast text+audio-only bundle.
 
 ## Auto-posting to Instagram (hands-off, no PC install)
 
@@ -219,6 +252,7 @@ social/
   calendar.py     N-day content calendar (topics x formats); batch kit generation
   videopack.py    long-form YouTube Video Pack + weekly opportunity report
   narration.py    long-form voiceover: per-beat MP3s + combined narration.mp3
+  render_long.py  long-form landscape MP4: visuals + voiceover (+ captions)
   storyboard.py   animated, dependency-free HTML Reel preview
   render.py       ffmpeg MP4 assembly + voiceover mixing
   publisher.py    Instagram Graph API publishing (Reels + image), stdlib only
