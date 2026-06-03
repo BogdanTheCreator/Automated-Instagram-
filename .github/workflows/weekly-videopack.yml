@@ -5,11 +5,13 @@
 #   2. Generates a complete, production-ready Video Pack for the top topic:
 #      title options, full 8-12 min narration script, SEO upload pack (description,
 #      tags, chapters, pinned comment), thumbnail concepts and promotion ideas.
-#   3. Uploads everything as a downloadable artifact you review before producing.
+#   3. Synthesizes the narration to MP3 (free edge-tts, or ElevenLabs if a key is
+#      set) — per-beat clips plus a combined narration.mp3 in the pack's audio/ folder.
+#   4. Uploads everything as a downloadable artifact you review before producing.
 #
-# This is text-only: no video is rendered and nothing is published, so it needs
-# no API keys and uses almost no CI minutes. You stay in control of the final
-# script, thumbnail, render and upload (supervised automation).
+# This needs no API keys and uses few CI minutes. Nothing is published, so you
+# stay in control of the final thumbnail, video assembly and upload (supervised
+# automation).
 #
 # OPTIONAL SECRET (GitHub -> Settings -> Secrets and variables -> Actions):
 #   OPENAI_API_KEY  -> writes the topic ideas + full narration with an LLM.
@@ -52,7 +54,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Generate the weekly opportunity report + Video Pack
+      - name: Install voiceover + audio tools (free, no API key)
+        run: |
+          # edge-tts gives free neural voices; ffmpeg merges the per-beat clips
+          # into a single narration.mp3. Both are optional — the pack is still
+          # produced without them.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          pip install -q edge-tts
+
+      - name: Generate the weekly opportunity report + Video Pack (with voiceover)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -63,9 +74,9 @@ jobs:
           echo "Using brand: $BRAND"
           if [ -n "$TOPIC" ]; then
             echo "Forcing topic: $TOPIC"
-            python -m social.cli "$TOPIC" --brand "$BRAND" --long --out weekly_out
+            python -m social.cli "$TOPIC" --brand "$BRAND" --long --voiceover --out weekly_out
           else
-            python -m social.cli --weekly --brand "$BRAND" --out weekly_out
+            python -m social.cli --weekly --brand "$BRAND" --voiceover --out weekly_out
           fi
 
       - name: Print a quick summary to the run log

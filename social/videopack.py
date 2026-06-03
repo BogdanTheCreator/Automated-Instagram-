@@ -173,12 +173,15 @@ def write_opportunities(brand_key: str, count: int = 10, out_root: str = "weekly
 # --------------------------------------------------------------------------- #
 
 def write_weekly(brand_key: str, out_root: str = "weekly_out",
-                 seconds: int = 0, llm: Optional[LLMProvider] = None) -> str:
+                 seconds: int = 0, llm: Optional[LLMProvider] = None,
+                 voiceover: bool = False) -> str:
     """Produce the full weekly bundle:
 
         weekly_out/
           opportunities.md / .json     ranked 10-topic scan
           video-pack/<...>/             complete Video Pack for the #1 topic
+            audio/                      narration MP3s (only if voiceover=True
+                                        and a TTS engine is available)
           INDEX.md                      what's inside + next steps
     """
     os.makedirs(out_root, exist_ok=True)
@@ -190,6 +193,18 @@ def write_weekly(brand_key: str, out_root: str = "weekly_out",
     pack_root = os.path.join(out_root, "video-pack")
     os.makedirs(pack_root, exist_ok=True)
     pack_folder = write_kit(kit, out_root=pack_root)
+
+    voiceover_line = ("3. Record/generate the voiceover (`voiceover.txt`), assemble visuals "
+                      "(`shotlist.md`), then upload using `seo.md`.")
+    if voiceover:
+        from .narration import synthesize_narration
+        res = synthesize_narration(kit, pack_folder)
+        if res.ok:
+            voiceover_line = ("3. Voiceover audio is in `video-pack/.../audio/` "
+                              "(`narration.mp3` + per-beat clips). Assemble visuals "
+                              "(`shotlist.md`) over it, then upload using `seo.md`.")
+        else:
+            voiceover_line += (f"\n   _(Auto-voiceover skipped: {res.message})_")
 
     index = [
         f"# Weekly content bundle — {kit.brand_name}",
@@ -209,8 +224,7 @@ def write_weekly(brand_key: str, out_root: str = "weekly_out",
         "## Next steps",
         "1. Skim `opportunities.md`; swap the pick if another topic fits better.",
         "2. Open `video-pack/.../VIDEO_PACK.md` — review the script, SEO and thumbnails.",
-        "3. Record/generate the voiceover (`voiceover.txt`), assemble visuals "
-        "(`shotlist.md`), then upload using `seo.md`.",
+        voiceover_line,
     ]
     _write(out_root, "INDEX.md", "\n".join(index) + "\n")
     return out_root

@@ -11,3 +11,8 @@ venv/
 
 # OS / editor
 .DS_Store
+
+# Local ad-hoc generation output (not committed; see samples/ for curated examples)
+first_video/
+video_packs/
+weekly_out/
