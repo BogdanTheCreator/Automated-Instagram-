@@ -1,0 +1,113 @@
+# Upload the weekly long-form Video Pack to YouTube — runs on GitHub's servers.
+#
+# WHAT IT DOES (manual trigger, or after you enable the schedule):
+#   1. Generates a full long-form Video Pack and renders video.mp4 (captions
+#      baked in) + thumbnail.jpg.
+#   2. Uploads the video to YOUR channel via the YouTube Data API.
+#
+# ONE-TIME SETUP (see SETUP_YOUTUBE.md):
+#   In Google Cloud Console: create a project, enable "YouTube Data API v3",
+#   create an OAuth client (type: Desktop app). Then locally run:
+#       YT_CLIENT_ID=... YT_CLIENT_SECRET=... python -m social.cli --youtube-auth
+#   and copy the printed refresh token.
+#
+#   Add these GitHub secrets (Settings -> Secrets and variables -> Actions):
+#       YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN
+#   Optional: OPENAI_API_KEY (richer scripts), PEXELS_API_KEY (better imagery).
+#
+# IMPORTANT: until your Google API project passes a one-time compliance audit,
+# uploads are forced to PRIVATE by YouTube and cannot be made public via the API.
+# That's fine for a review-then-publish workflow: the video lands on your channel
+# and you flip it to Public in YouTube Studio after a quick look. Choose the
+# privacy input below (private/unlisted) accordingly.
+
+name: Upload to YouTube
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: "Niche brand key"
+        default: "betrayal_revenge"
+      topic:
+        description: "Optional: force a topic (blank = auto-pick the week's best)"
+        default: ""
+      privacy:
+        description: "private | unlisted | public (public needs an audited API project)"
+        default: "private"
+  # Uncomment to run weekly (Mondays 09:00 UTC, an hour after the pack is built):
+  # schedule:
+  #   - cron: "0 9 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youtube-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install video + voiceover tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install -q edge-tts
+
+      - name: Generate + render the long-form Video Pack
+        id: gen
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          BRAND="${{ github.event.inputs.brand }}"
+          [ -z "$BRAND" ] && BRAND="${{ vars.BRAND }}"
+          [ -z "$BRAND" ] && BRAND="betrayal_revenge"
+          TOPIC="${{ github.event.inputs.topic }}"
+          if [ -n "$TOPIC" ]; then
+            python -m social.cli "$TOPIC" --brand "$BRAND" --long --render --out yt_out
+          else
+            python -m social.cli --videopack --brand "$BRAND" --render --out yt_out
+          fi
+          # Find the kit folder that contains the rendered video.
+          KIT="$(dirname "$(find yt_out -name video.mp4 | head -1)")"
+          echo "kit=$KIT" >> "$GITHUB_OUTPUT"
+          echo "Rendered kit: $KIT"
+
+      - name: Upload to YouTube
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: |
+          KIT="${{ steps.gen.outputs.kit }}"
+          PRIV="${{ github.event.inputs.privacy }}"
+          [ -z "$PRIV" ] && PRIV="private"
+          if [ -z "$KIT" ] || [ ! -f "$KIT/video.mp4" ]; then
+            echo "No rendered video found; nothing to upload."
+            exit 0
+          fi
+          if [ -z "$YT_CLIENT_ID" ] || [ -z "$YT_REFRESH_TOKEN" ]; then
+            echo "YouTube secrets not set — running a DRY RUN (no upload)."
+            python -m social.cli --youtube-upload --kit "$KIT" --privacy "$PRIV" --dry-run
+          else
+            python -m social.cli --youtube-upload --kit "$KIT" --privacy "$PRIV"
+          fi
+
+      - name: Save the kit as a downloadable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-video-pack
+          path: yt_out/**
+          if-no-files-found: ignore
