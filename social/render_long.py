@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -295,18 +296,102 @@ def _concat(clips: List[str], tmp: str) -> str:
     return out
 
 
-def _resynced_srt(scenes_durations: List[tuple], tmp: str) -> str:
-    """Build an SRT whose timings match the actual per-beat audio durations."""
-    def ts(t: float) -> str:
-        h = int(t // 3600); m = int((t % 3600) // 60)
-        s = int(t % 60); ms = int(round((t - int(t)) * 1000))
-        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+_SENTENCE_RE = re.compile(r"[^.!?]+[.!?]*")
 
-    lines, t = [], 0.0
-    for i, (text, dur) in enumerate(scenes_durations, start=1):
-        start, end = t, t + dur
-        lines += [str(i), f"{ts(start)} --> {ts(end)}", text.strip(), ""]
-        t = end
+
+def _caption_chunks(text: str, max_chars: int = 90) -> List[str]:
+    """Split narration into short caption cues of 1-2 short sentences.
+
+    A cue is a single sentence, unless two consecutive sentences are both short
+    enough to comfortably fit on screen together (<= max_chars combined), in
+    which case they're paired. Long sentences are split on a clause break so no
+    cue is an unreadable wall of text.
+    """
+    sentences = [s.strip() for s in _SENTENCE_RE.findall(text) if s.strip()]
+    # Further split any over-long sentence at a comma / natural pause.
+    pieces: List[str] = []
+    for s in sentences:
+        if len(s) <= max_chars:
+            pieces.append(s)
+            continue
+        buf = ""
+        for part in re.split(r"(,|;| - | — )", s):
+            if part in (",", ";", " - ", " — "):
+                buf += part
+                continue
+            if buf and len(buf) + len(part) > max_chars:
+                pieces.append(buf.strip())
+                buf = part
+            else:
+                buf += part
+        if buf.strip():
+            pieces.append(buf.strip())
+
+    # Hard fallback: if any piece is still too long (e.g. no punctuation at all),
+    # wrap it on word boundaries so no caption is an unreadable wall of text.
+    wrapped: List[str] = []
+    for piece in pieces:
+        if len(piece) <= max_chars:
+            wrapped.append(piece)
+            continue
+        words, line = piece.split(), ""
+        for w in words:
+            if line and len(line) + 1 + len(w) > max_chars:
+                wrapped.append(line)
+                line = w
+            else:
+                line = f"{line} {w}".strip()
+        if line:
+            wrapped.append(line)
+    pieces = wrapped
+
+    # Greedily pair adjacent short pieces (<= max_chars together).
+    cues: List[str] = []
+    i = 0
+    while i < len(pieces):
+        cur = pieces[i]
+        if (i + 1 < len(pieces)
+                and len(cur) + 1 + len(pieces[i + 1]) <= max_chars):
+            cues.append((cur + " " + pieces[i + 1]).strip())
+            i += 2
+        else:
+            cues.append(cur)
+            i += 1
+    return cues or [text.strip()]
+
+
+def _ts(t: float) -> str:
+    if t < 0:
+        t = 0
+    h = int(t // 3600); m = int((t % 3600) // 60)
+    s = int(t % 60); ms = int(round((t - int(t)) * 1000))
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _resynced_srt(scenes_durations: List[tuple], tmp: str) -> str:
+    """Build an SRT that advances roughly in time with the speech.
+
+    Each beat's narration is split into short cues (1-2 short sentences) and the
+    beat's audio duration is shared across those cues in proportion to their
+    word count — so a cue stays on screen about as long as it takes to say it,
+    then the next sentence appears. This is the "karaoke-ish" sync the user asked
+    for without needing a forced-alignment model.
+    """
+    lines: List[str] = []
+    idx = 1
+    t = 0.0
+    for text, dur in scenes_durations:
+        cues = _caption_chunks(text)
+        weights = [max(1, len(c.split())) for c in cues]
+        total_w = sum(weights) or 1
+        ct = t
+        for cue, w in zip(cues, weights):
+            seg = dur * (w / total_w)
+            start, end = ct, ct + seg
+            lines += [str(idx), f"{_ts(start)} --> {_ts(end)}", cue, ""]
+            idx += 1
+            ct = end
+        t += dur
     path = os.path.join(tmp, "resynced.srt")
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
@@ -316,10 +401,16 @@ def _resynced_srt(scenes_durations: List[tuple], tmp: str) -> str:
 def _burn_subtitles(video: str, srt_path: str, tmp: str) -> str:
     """Hard-burn captions using the libass `subtitles` filter (independent of
     drawtext, so this works even on builds without libfreetype). The input
-    `video` has no audio yet, so no audio handling is needed here."""
+    `video` has no audio yet, so no audio handling is needed here.
+
+    Style: bold white text with a thick black outline, anchored near the very
+    bottom-center of the frame — readable on any background, classic faceless-
+    storytelling look. (1080p height, so MarginV is in that coordinate space.)
+    """
     out = os.path.join(tmp, "video_subs.mp4")
-    style = ("FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-             "BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=60")
+    style = ("Fontname=DejaVu Sans,Fontsize=26,Bold=1,"
+             "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H66000000,"
+             "BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=48,MarginL=80,MarginR=80")
     # ffmpeg's subtitles filter parses ':' inside the path; escape it.
     srt_escaped = srt_path.replace("\\", "/").replace(":", "\\:")
     try:
@@ -353,11 +444,34 @@ def _pick_overlay(kit: ContentKit, brand: Brand) -> str:
 
 
 def _thumb_background(kit: ContentKit, tmp: str) -> Optional[str]:
-    """Landscape background art for the thumbnail (AI if available, else None)."""
+    """Landscape background image for the thumbnail.
+
+    Reuses the same photo pipeline as the video beats (Pexels if keyed, else the
+    free no-key Openverse/Wikimedia sources, else AI art) so the thumbnail shows
+    a real, relevant image out of the box instead of a flat colour. Falls back
+    to None (gradient) only if nothing can be fetched.
+    """
+    # A strong, emotive search for the cover — prefer the hook/betrayal mood.
+    queries = [
+        "dramatic dark portrait silhouette",
+        "rain window night",
+        "shadow figure doorway",
+    ]
+    photos = auto_photos()
+    if getattr(photos, "name", "") != "offline-none":
+        for q in queries:
+            try:
+                urls = photos.search(q, count=1, orientation="landscape")
+            except Exception:
+                urls = []
+            if urls:
+                dst = os.path.join(tmp, "thumb_bg.jpg")
+                if _download(urls[0], dst):
+                    return dst
+    # AI art fallback (needs OPENAI_API_KEY).
     img = auto_image()
     if getattr(img, "name", "") != "offline-gradient":
         out = os.path.join(tmp, "thumb_bg.png")
-        # Bias the prompt toward the niche mood for a cohesive cover.
         made = img.background(f"{kit.topic}, dramatic cinematic, dark moody", out)
         if made:
             return made
@@ -366,15 +480,20 @@ def _thumb_background(kit: ContentKit, tmp: str) -> Optional[str]:
 
 def render_thumbnail(kit: ContentKit, out_path: str,
                      brand: Optional[Brand] = None) -> RenderResult:
-    """Generate a 1280x720 thumbnail.jpg: bold overlay text over AI art or an
-    on-brand gradient. Best-effort; returns ok=False with a message on failure."""
+    """Generate a 1280x720 high-CTR thumbnail: a real background image, darkened
+    on one side for legibility, with a big bold punchy phrase in the brand
+    accent colour. Best-effort; returns ok=False with a message on failure.
+
+    Design follows common high-CTR principles: one clear idea, very large bold
+    text, strong contrast, a coloured keyword, and a subject image behind it.
+    """
     if not has_ffmpeg():
         return RenderResult(ok=False, path=None,
                             message="ffmpeg not found — thumbnail not generated.")
     brand = brand or get_brand(kit.brand_key)
     p = brand.palette
     overlay = _pick_overlay(kit, brand)
-    main = _escape_drawtext(_wrap(overlay, 16))
+    main = _escape_drawtext(_wrap(overlay, 14))
     series = _escape_drawtext((kit.series_name or brand.display_name).upper())
     accent = _hex_to_ffmpeg(p.accent)
     accent2 = _hex_to_ffmpeg(getattr(p, "accent2", p.accent))
@@ -384,44 +503,45 @@ def render_thumbnail(kit: ContentKit, out_path: str,
     try:
         bg = _thumb_background(kit, tmp)
         has_text = _has_drawtext()
-        # Big, bold, high-contrast title text with a heavy shadow; a left accent
-        # bar and a small series kicker. Reads clearly at small sizes on mobile.
-        # When drawtext is unavailable we still emit a styled background with the
-        # accent bar so the thumbnail is usable (text can be added in any editor).
+        # Composition: subject image fills the frame; a left-to-right dark
+        # gradient panel keeps the left ~60% readable for the headline. A thick
+        # accent underline sits beneath the headline. Large text, heavy shadow.
         text_layers = ""
         if has_text:
             text_layers = (
-                f",drawtext=text='{series}'{_font_clause()}:fontcolor={accent2}:fontsize=44:"
-                f"x=70:y=64:shadowcolor=0x000000:shadowx=2:shadowy=2"
-                f",drawtext=text='{main}'{_font_clause()}:fontcolor={textcol}:fontsize=150:"
-                f"x=70:y=(h-text_h)/2+30:line_spacing=12:"
-                f"shadowcolor=0x000000:shadowx=5:shadowy=5"
+                # series kicker, top-left, in accent2
+                f",drawtext=text='{series}'{_font_clause()}:fontcolor={accent2}:fontsize=46:"
+                f"x=80:y=70:shadowcolor=0x000000:shadowx=3:shadowy=3"
+                # main headline, large, left-aligned, vertically centred-ish
+                f",drawtext=text='{main}'{_font_clause()}:fontcolor={textcol}:fontsize=130:"
+                f"x=80:y=h/2-text_h/2+20:line_spacing=14:"
+                f"borderw=6:bordercolor=0x000000:shadowcolor=0x000000:shadowx=6:shadowy=6"
             )
+        # The darkening panel: full dark wash + a heavier vertical band on the
+        # left third so text pops regardless of the photo behind it.
         draw = (
-            # darken for text legibility
-            f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000@0.45:t=fill,"
-            # left accent bar
-            f"drawbox=x=0:y=0:w=18:h=ih:color={accent}:t=fill"
+            f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000@0.35:t=fill,"
+            f"drawbox=x=0:y=0:w=iw*0.62:h=ih:color=0x000000@0.45:t=fill,"
+            f"drawbox=x=0:y=0:w=16:h=ih:color={accent}:t=fill"
             + text_layers
         )
         if bg:
             vf = (f"scale={THUMB_W}:{THUMB_H}:force_original_aspect_ratio=increase,"
-                  f"crop={THUMB_W}:{THUMB_H}," + draw)
-            cmd = ["ffmpeg", "-y", "-i", bg, "-vf", vf, "-frames:v", "1", out_path]
+                  f"crop={THUMB_W}:{THUMB_H},setsar=1," + draw)
+            cmd = ["ffmpeg", "-y", "-i", bg, "-vf", vf, "-frames:v", "1",
+                   "-q:v", "2", out_path]
         else:
             base = _hex_to_ffmpeg(p.bg)
             base2 = _hex_to_ffmpeg(p.bg2)
-            # `gradients` is a source filter: use it as the lavfi INPUT, then
-            # draw text/boxes over it. (Falls back to a flat color below if an
-            # older ffmpeg lacks the gradients source.)
             cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i",
                    f"gradients=s={THUMB_W}x{THUMB_H}:c0={base}:c1={base2}:"
                    f"x0=0:y0=0:x1={THUMB_W}:y1={THUMB_H}",
-                   "-frames:v", "1", "-vf", draw, out_path]
+                   "-frames:v", "1", "-vf", draw, "-q:v", "2", out_path]
         subprocess.run(cmd, check=True, capture_output=True)
         if os.path.exists(out_path):
+            kind = "image" if bg else "gradient"
             return RenderResult(ok=True, path=out_path,
-                                message=f"Thumbnail: {out_path} (overlay: \"{overlay}\").")
+                                message=f"Thumbnail ({kind} bg): {out_path} (overlay: \"{overlay}\").")
         return RenderResult(ok=False, path=None, message="Thumbnail render produced no file.")
     except subprocess.CalledProcessError:
         # gradients filter may be unavailable on very old ffmpeg — retry flat.
