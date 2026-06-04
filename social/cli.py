@@ -182,6 +182,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Public URL of a cover image for the Reel (with --publish).")
     p.add_argument("--refresh-token", action="store_true",
                    help="Refresh the long-lived IG token (needs IG_APP_ID, IG_APP_SECRET, IG_ACCESS_TOKEN).")
+    # YouTube publishing
+    p.add_argument("--youtube-auth", action="store_true",
+                   help="One-time interactive OAuth to mint a YouTube refresh token "
+                        "(needs YT_CLIENT_ID + YT_CLIENT_SECRET). Run locally once.")
+    p.add_argument("--youtube-upload", action="store_true",
+                   help="Upload a local video file to YouTube (needs YT_CLIENT_ID, "
+                        "YT_CLIENT_SECRET, YT_REFRESH_TOKEN).")
+    p.add_argument("--video-file", default=None,
+                   help="Path to a local .mp4 to upload (with --youtube-upload).")
+    p.add_argument("--privacy", default="private",
+                   choices=["private", "unlisted", "public"],
+                   help="YouTube privacy status (default private; unverified API "
+                        "projects are forced to private regardless).")
     p.add_argument("--version", action="version", version=f"social {__version__}")
     return p
 
@@ -430,6 +443,86 @@ def _run_verify_instagram() -> int:
     return 0 if res.ok else 1
 
 
+def _run_youtube_auth() -> int:
+    """One-time interactive flow to mint a YouTube refresh token."""
+    from .youtube import build_auth_url, exchange_code_for_refresh_token
+    cid = os.getenv("YT_CLIENT_ID", "").strip()
+    secret = os.getenv("YT_CLIENT_SECRET", "").strip()
+    if not (cid and secret):
+        print("Set YT_CLIENT_ID and YT_CLIENT_SECRET first (from Google Cloud "
+              "Console -> Credentials -> OAuth client, type 'Desktop app').",
+              file=sys.stderr)
+        return 1
+    print("\n1) Open this URL in your browser and approve access:\n")
+    print("   " + build_auth_url(cid) + "\n")
+    print("2) Google will show you a code. Paste it here.\n")
+    try:
+        code = input("   Authorization code: ").strip()
+    except EOFError:
+        print("No input available; run this locally in a terminal.", file=sys.stderr)
+        return 1
+    if not code:
+        print("No code entered.", file=sys.stderr)
+        return 1
+    out = exchange_code_for_refresh_token(cid, secret, code)
+    refresh = str(out.get("refresh_token") or "")
+    if not refresh:
+        print(f"Failed to obtain refresh token: {out.get('error', out)}", file=sys.stderr)
+        return 1
+    print("\n  Success. Add this as a GitHub secret named YT_REFRESH_TOKEN:\n")
+    print("   " + refresh + "\n")
+    print("  (Keep it secret — it grants upload access to your channel.)")
+    return 0
+
+
+def _run_youtube_upload(args) -> int:
+    from .youtube import YouTubeUploader
+    cid = os.getenv("YT_CLIENT_ID", "").strip()
+    secret = os.getenv("YT_CLIENT_SECRET", "").strip()
+    refresh = os.getenv("YT_REFRESH_TOKEN", "").strip()
+
+    # Resolve the video + metadata: explicit --video-file, or from a --kit folder.
+    video = args.video_file
+    title, description, tags = args.caption or "", "", []
+    if args.kit:
+        pkg = os.path.join(args.kit, "content_package.json")
+        if os.path.exists(pkg):
+            with open(pkg, encoding="utf-8") as fh:
+                data = json.load(fh)
+            yt = data.get("youtube", {}) or {}
+            title = yt.get("best_title") or data.get("title", "") or title
+            description = yt.get("description", "")
+            tags = yt.get("tags", []) or []
+            if not video:
+                cand = os.path.join(args.kit, "video.mp4")
+                video = cand if os.path.exists(cand) else None
+    if not title:
+        title = "Untitled"
+
+    if args.dry_run or not (cid and secret and refresh and video):
+        reason = ("dry-run requested" if args.dry_run
+                  else "missing YT_* creds or --video-file/--kit video")
+        print(f"  [dry run] not uploading ({reason}).")
+        print(f"    video      : {video or '(none)'}")
+        print(f"    title      : {title}")
+        print(f"    privacy    : {args.privacy}")
+        print(f"    creds set  : client_id={bool(cid)} secret={bool(secret)} refresh={bool(refresh)}")
+        print(f"    tags       : {', '.join(tags[:10])}")
+        return 0 if args.dry_run else 1
+
+    up = YouTubeUploader(cid, secret, refresh)
+    res = up.upload(video, title, description, tags=tags, privacy_status=args.privacy)
+    for line in res.steps:
+        print(f"    - {line}")
+    if res.ok:
+        print(f"\n  Uploaded to YouTube: {res.url}")
+        print("  Note: unverified API projects upload as PRIVATE — review it in "
+              "YouTube Studio and set it Public when ready.")
+        return 0
+    print(f"\n  Upload failed: {res.message or 'see steps above'}", file=sys.stderr)
+    return 1
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -443,6 +536,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_verify_instagram()
     if args.refresh_token:
         return _run_refresh_token()
+    if args.youtube_auth:
+        return _run_youtube_auth()
+    if args.youtube_upload:
+        return _run_youtube_upload(args)
     if args.autopost:
         return _run_autopost(args)
     if args.publish:
