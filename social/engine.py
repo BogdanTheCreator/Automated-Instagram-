@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import textwrap
 from dataclasses import asdict, dataclass, field
@@ -242,82 +243,213 @@ def _normalize_llm(data: Dict[str, object], topic: str, brand: Brand) -> Dict[st
 # --------------------------------------------------------------------------- #
 
 # A believable betrayal/revenge arc. Each beat carries an overlay label, a
-# starter narration line (topic-aware, restrained — clearly a draft to edit),
-# and a b-roll search phrase. When an LLM key is present the prose is fully
-# written instead; offline you still get a complete, well-structured beat sheet.
+# b-roll search phrase, and a POOL of interchangeable narration paragraphs.
+# The offline generator picks (and combines) a couple of paragraphs per beat,
+# chosen by a per-run seed, so that:
+#   * the script is long enough for a true 8-12 minute video, and
+#   * re-running the same topic produces a genuinely different script.
+# When an LLM key is present the prose is fully written instead.
+#
+# Structure: (role, on_screen_label, broll_query, [paragraph variants...])
+# Placeholders: {topic} verbatim, {Topic} sentence-initial, {payoff} payoff line.
 STORY_ARC = [
-    ("setup", "Before it all went wrong",
-     "Let me take you back to before any of this happened. Life was ordinary then, "
-     "and honestly, I liked it that way. I had no idea what was coming.",
-     "quiet everyday life, soft morning light"),
-    ("trust", "I trusted them",
-     "I trusted them completely. That's the part that still matters, because you "
-     "don't get betrayed by strangers. You get betrayed by the people you let all "
-     "the way in.",
-     "two people laughing, warm candid memories"),
-    ("first_crack", "The first small sign",
-     "The first sign was small. So small I talked myself out of it. A look that "
-     "lasted a second too long, an answer that didn't quite fit. I let it go.",
-     "phone face-down on a table, subtle tension"),
-    ("suspicion", "It stopped adding up",
-     "But small things add up. Soon I was noticing the gaps. The times that didn't "
-     "line up. The stories that changed depending on the day. So I started paying "
-     "attention.",
-     "clock, calendar, a door closing"),
-    ("betrayal", "Then I found out",
-     "Then it all came out. {Topic}. I'm not going to pretend I was calm. The floor "
-     "just moved, and everything I thought I understood rearranged itself in a "
-     "single moment.",
-     "rain on a dark window, dim room"),
-    ("fallout", "The quiet after",
-     "For a few days I barely functioned. Part of me wanted to scream. A bigger "
-     "part of me went very, very quiet. And looking back, that quiet was the most "
-     "dangerous thing in the room.",
-     "empty room, single lamp, long shadows"),
-    ("decision", "I made a decision",
-     "That's when I decided something. I wasn't going to beg, and I wasn't going "
-     "to explode. I was going to wait, and I was going to be precise.",
-     "close-up of steady, determined eyes"),
-    ("plan", "I started preparing",
-     "So I started preparing. Nothing dramatic. Just the truth, organized. Dates. "
-     "Messages. Receipts. Everything they thought was hidden, quietly gathered in "
-     "one place.",
-     "documents, folder, screenshots on a screen"),
-    ("escalation", "They had no idea",
-     "And they had no idea. They kept performing, kept smiling, kept assuming I "
-     "was still the person who missed the first sign. I let them keep thinking "
-     "that. It made what came next so much cleaner.",
-     "dinner table, forced smiles, glances"),
-    ("turning_point", "The tables turned",
-     "Then came the moment I'd been building toward. One room. The right people. "
-     "And the truth laid out plainly, where no one could twist it or talk over it.",
-     "meeting room, papers laid on a table"),
-    ("payoff", "It was already too late",
-     "{payoff}",
-     "a stunned, silent realization"),
-    ("aftermath", "What was left",
-     "There were no fireworks. Just consequences, arriving right on schedule. They "
-     "lost the thing they had risked everything to protect, and I got my life back "
-     "without ever lowering myself to their level.",
-     "an open door, walking into daylight"),
-    ("reflection", "What it taught me",
-     "Here's what I learned. The loudest reaction is almost never the strongest "
-     "one. Sometimes the calmest person in the room is simply the one who already "
-     "knows how the story ends.",
-     "calm sunrise, a steady horizon"),
+    ("setup", "Before it all went wrong", "quiet everyday life, soft morning light", [
+        "Let me take you back to before any of this happened. Life was ordinary then, "
+        "and honestly, I liked it that way. I had a routine, people I thought I could "
+        "count on, and not the faintest idea of what was coming.",
+        "If you'd asked me back then, I'd have told you everything was fine. Better than "
+        "fine. The kind of ordinary, comfortable life you stop noticing because you "
+        "assume it will always be there.",
+        "It's strange looking back now. There was a version of me that felt completely "
+        "safe, completely sure of the people around me. I want you to hold on to that "
+        "image, because it makes everything that follows hit the way it hit me.",
+        "Before all of this, I was not a suspicious person. I gave people the benefit "
+        "of the doubt. I assumed the best. That part of me is the reason this story "
+        "even exists.",
+    ]),
+    ("trust", "I trusted them", "two people laughing, warm candid memories", [
+        "I trusted them completely. That's the part that still matters, because you "
+        "don't get betrayed by strangers. You get betrayed by the people you let all "
+        "the way in.",
+        "We had history. Years of it. The kind of bond where you stop keeping score "
+        "because you genuinely believe you're on the same side. I never once thought "
+        "to protect myself from them.",
+        "I would have defended them to anyone. In fact, I did, more than once. That's "
+        "how deep the trust went. Their word was as good as mine, as far as I was "
+        "concerned.",
+        "Looking back, my trust wasn't naive exactly. They earned it, over a long time, "
+        "with a hundred small kindnesses. Which is exactly what made the betrayal so "
+        "hard to see coming.",
+    ]),
+    ("first_crack", "The first small sign", "phone face-down on a table, subtle tension", [
+        "The first sign was small. So small I talked myself out of it. A look that "
+        "lasted a second too long, an answer that didn't quite fit. I let it go.",
+        "It started with a feeling more than a fact. Something just slightly off, the "
+        "way a room feels different when someone's moved one thing and won't tell you "
+        "what. I told myself I was imagining it.",
+        "There was a moment, early on, that I keep coming back to. A phone turned face "
+        "down a little too quickly. A sentence that started and then changed direction. "
+        "Nothing you could prove. Everything you could feel.",
+        "If I'm honest, a part of me noticed right away. But noticing and admitting are "
+        "two different things, and back then I wasn't ready to admit that the person in "
+        "front of me might not be who I thought.",
+    ]),
+    ("suspicion", "It stopped adding up", "clock, calendar, a door closing", [
+        "But small things add up. Soon I was noticing the gaps. The times that didn't "
+        "line up. The stories that changed depending on the day. So I started paying "
+        "attention.",
+        "Once you see one thread out of place, you can't unsee it. I'd replay "
+        "conversations and catch the seams. A detail here that contradicted a detail "
+        "there. None of it loud, all of it wrong.",
+        "I didn't say anything. Not yet. I just started listening differently, the way "
+        "you do when you finally stop assuming and start observing. And the more I "
+        "listened, the less of it held together.",
+        "There's a specific kind of exhaustion that comes from defending someone to "
+        "yourself. I was doing it constantly now, inventing explanations on their "
+        "behalf, and the explanations were getting thinner every week.",
+    ]),
+    ("betrayal", "Then I found out", "rain on a dark window, dim room", [
+        "Then it all came out. {Topic}. I'm not going to pretend I was calm. The floor "
+        "just moved, and everything I thought I understood rearranged itself in a "
+        "single moment.",
+        "And then I knew. Not suspected. Knew. {Topic}. There's no gentle way to take "
+        "in something like that. It rewrites your past and your present in the same "
+        "breath.",
+        "When the truth finally landed, it wasn't dramatic. It was quiet and total. "
+        "{Topic}. I remember the exact silence in the room, the way my own heartbeat "
+        "sounded too loud.",
+        "The thing about the moment you find out is that it splits your life in two. "
+        "There's everything before {topic}, and everything after, and you never quite "
+        "get to be the before-person again.",
+    ]),
+    ("fallout", "The quiet after", "empty room, single lamp, long shadows", [
+        "For a few days I barely functioned. Part of me wanted to scream. A bigger "
+        "part of me went very, very quiet. And looking back, that quiet was the most "
+        "dangerous thing in the room.",
+        "I didn't cry the way I expected to. Mostly I just sat with it, turning it over, "
+        "feeling the anger cool into something harder and more useful. Something patient.",
+        "People expect you to fall apart, and for a little while I let them think I had. "
+        "But underneath, something was clarifying. The shock was burning off, and what "
+        "it left behind was very clear.",
+        "Grief and rage take turns when you're betrayed. What surprised me was how, once "
+        "they'd both had their say, what remained wasn't chaos at all. It was focus.",
+    ]),
+    ("decision", "I made a decision", "close-up of steady, determined eyes", [
+        "That's when I decided something. I wasn't going to beg, and I wasn't going "
+        "to explode. I was going to wait, and I was going to be precise.",
+        "I made myself a promise in that quiet. No scenes. No screaming matches they "
+        "could use to paint me as the unstable one. Just the truth, delivered at "
+        "exactly the right moment.",
+        "Revenge is the wrong word for what I decided. I didn't want to hurt them. I "
+        "wanted the truth to do what the truth does on its own, in the open, where they "
+        "couldn't spin it.",
+        "I chose patience on purpose. Patience is underrated. It feels like doing "
+        "nothing, but really it's letting someone keep building the case against "
+        "themselves while you simply keep the receipts.",
+    ]),
+    ("plan", "I started preparing", "documents, folder, screenshots on a screen", [
+        "So I started preparing. Nothing dramatic. Just the truth, organized. Dates. "
+        "Messages. Receipts. Everything they thought was hidden, quietly gathered in "
+        "one place.",
+        "I became a quiet archivist of my own life. Every inconsistency got a timestamp. "
+        "Every claim got something to check it against. I wasn't building a weapon. I "
+        "was building a record.",
+        "Bit by bit, I put it together. Not to confront them in the heat of the moment, "
+        "but to have something undeniable when the moment finally came. Facts don't "
+        "raise their voice, and they don't back down.",
+        "It's amazing what you notice when you stop reacting and start documenting. The "
+        "story they'd been telling had holes you could drive a truck through, and now I "
+        "had every one of them written down.",
+    ]),
+    ("escalation", "They had no idea", "dinner table, forced smiles, glances", [
+        "And they had no idea. They kept performing, kept smiling, kept assuming I "
+        "was still the person who missed the first sign. I let them keep thinking "
+        "that. It made what came next so much cleaner.",
+        "The hardest part was acting normal. Smiling back. Asking the ordinary "
+        "questions. But every easy lie they told me now was one more thing I knew, and "
+        "one more thing they didn't know I knew.",
+        "They got comfortable. Comfortable people get careless, and careless people "
+        "leave a trail. I just had to stay calm long enough to let them walk it.",
+        "There's a strange power in being underestimated. They still saw the trusting "
+        "person from the beginning of this story. They had no idea that person had been "
+        "quietly replaced by someone paying very close attention.",
+    ]),
+    ("turning_point", "The tables turned", "meeting room, papers laid on a table", [
+        "Then came the moment I'd been building toward. One room. The right people. "
+        "And the truth laid out plainly, where no one could twist it or talk over it.",
+        "When I finally moved, I didn't shout. I just put it all on the table, calmly, "
+        "in front of the people whose opinion actually mattered. And the room went "
+        "very, very still.",
+        "I'd waited for exactly the right moment, and when it came I didn't rush it. I "
+        "let the facts speak in order, one after another, and I watched their story "
+        "collapse in real time.",
+        "There was no ambush, no trap. Just daylight. I brought everything into the open "
+        "where spin doesn't survive, and for the first time they had nothing to say.",
+    ]),
+    ("payoff", "It was already too late", "a stunned, silent realization", [
+        "{payoff}",
+        "{payoff} And by the time they understood what was happening, there was nothing "
+        "left for them to do but watch it land.",
+        "{payoff} I didn't have to add a single word. The silence did the rest.",
+    ]),
+    ("aftermath", "What was left", "an open door, walking into daylight", [
+        "There were no fireworks. Just consequences, arriving right on schedule. They "
+        "lost the thing they had risked everything to protect, and I got my life back "
+        "without ever lowering myself to their level.",
+        "Afterward, things got quiet in a different way — the clean kind. The people who "
+        "needed to know, knew. And I walked out of it lighter than I'd felt in months.",
+        "I didn't celebrate. There's nothing to celebrate, really. But I slept that "
+        "night, properly, for the first time in a long time, and that was its own kind "
+        "of justice.",
+        "What was left, when the dust settled, was simple. They had to live with what "
+        "they'd done, in full view. And I got to walk away knowing I'd handled it "
+        "without becoming someone I'd be ashamed of.",
+    ]),
+    ("reflection", "What it taught me", "calm sunrise, a steady horizon", [
+        "Here's what I learned. The loudest reaction is almost never the strongest "
+        "one. Sometimes the calmest person in the room is simply the one who already "
+        "knows how the story ends.",
+        "If there's one thing I'd pass on, it's this: don't let anyone rush your "
+        "response. Patience isn't weakness. Done right, it's the most powerful move you "
+        "have.",
+        "I don't tell this story to glorify revenge. I tell it because trusting people "
+        "is still the right way to live — you just have to be willing to see clearly "
+        "when someone proves they don't deserve it.",
+        "Looking back, I don't regret trusting them. I regret ignoring the first signs. "
+        "So if your gut is whispering that something's wrong, don't argue with it. "
+        "Quietly, calmly, start paying attention.",
+    ]),
 ]
 
 
-def _framework_story(topic: str, brand: Brand) -> Dict[str, object]:
-    """Deterministic, brand-aware long-form beat sheet (no LLM required)."""
-    seed = sum(ord(c) for c in topic) or 1
-    hook = _fmt_template(brand.hook_templates[seed % len(brand.hook_templates)], topic)
-    payoff = brand.payoff_templates[seed % len(brand.payoff_templates)]
-    cta = brand.cta_templates[(seed // 3) % len(brand.cta_templates)]
+def _framework_story(topic: str, brand: Brand, seed: Optional[int] = None) -> Dict[str, object]:
+    """Brand-aware long-form beat sheet (no LLM required).
+
+    Builds a full ~8-12 minute narration by composing two interchangeable
+    paragraphs per beat from each beat's pool. `seed` controls the selection:
+    pass a fixed int for reproducible output, or leave None for a fresh,
+    different script on every run (fixes "the same video over and over").
+    """
+    if seed is None:
+        seed = random.randint(0, 1_000_000)
+    rng = random.Random(seed)
+
+    hook = _fmt_template(rng.choice(brand.hook_templates), topic)
+    payoff = rng.choice(brand.payoff_templates)
+    cta = rng.choice(brand.cta_templates)
+
+    def fill(text: str) -> str:
+        return text.format(topic=topic, Topic=_cap_first(topic), payoff=payoff)
 
     beats: List[Dict[str, str]] = []
-    for role, on_screen, narration_tmpl, broll in STORY_ARC:
-        narration = narration_tmpl.format(topic=topic, Topic=_cap_first(topic), payoff=payoff)
+    for role, on_screen, broll, variants in STORY_ARC:
+        pool = list(variants)
+        rng.shuffle(pool)
+        # Combine several interchangeable paragraphs per beat for length + variety
+        # so the offline script reaches a true ~8-12 minute narration. The short
+        # payoff beat keeps a single punchy line.
+        take = 1 if role == "payoff" else min(3, len(pool))
+        narration = " ".join(fill(p) for p in pool[:take])
         beats.append({
             "role": role,
             "section": on_screen,

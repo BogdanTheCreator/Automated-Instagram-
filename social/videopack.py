@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import json
 import os
+import random
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 from .brand import Brand, get_brand
@@ -65,8 +66,11 @@ def _classify(topic: str) -> Tuple[str, str]:
 
 def _story_topics_offline(brand: Brand, count: int) -> List[str]:
     """Story-aware offline topic pool: use the niche's story premises verbatim
-    (themes + seeds) rather than the short-form 'angle x theme' combiner. Rotated
-    by ISO week so the weekly report surfaces a fresh set each Monday."""
+    (themes + seeds) rather than the short-form 'angle x theme' combiner.
+
+    The pool is SHUFFLED per run so repeated weekly runs surface a different
+    ranked set (and therefore a different #1 pick) — this is what stops the
+    system from producing the same video over and over."""
     pool: List[str] = []
     seen = set()
     for t in (brand.themes or []) + (brand.topic_seeds or []):
@@ -76,9 +80,8 @@ def _story_topics_offline(brand: Brand, count: int) -> List[str]:
             pool.append(t)
     if not pool:
         return []
-    week = date.today().isocalendar()[1]
-    n = min(count, len(pool))
-    return [pool[(i + week) % len(pool)] for i in range(n)]
+    random.shuffle(pool)
+    return pool[:min(count, len(pool))]
 
 
 def _propose_topics_for_pack(brand: Brand, count: int,
